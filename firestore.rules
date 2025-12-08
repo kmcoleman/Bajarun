@@ -3,11 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Registrations - users can only read/write their own
+    // Registrations - authenticated users can read all, write their own
     match /registrations/{registrationId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+      allow update: if request.auth != null && request.auth.uid == resource.data.uid;
       allow delete: if false; // No deletes allowed
     }
 
@@ -25,12 +25,6 @@ service cloud.firestore {
         allow update: if request.auth != null && request.auth.uid == resource.data.authorId;
         allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
       }
-    }
-
-    // Participants - authenticated users can read all registered participants
-    match /participants/{participantId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Only created via cloud function or admin
     }
 
     // Admin collection - only admins can read/write

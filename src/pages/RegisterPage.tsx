@@ -6,7 +6,7 @@
  * Collects rider info, experience, and preferences.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -24,8 +24,13 @@ import {
   Loader2,
   Heart,
   Wrench,
-  Globe
+  Globe,
+  Camera,
+  X
 } from 'lucide-react';
+import { db, storage } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface FormData {
   // Personal Info
@@ -97,12 +102,46 @@ const initialFormData: FormData = {
 };
 
 export default function RegisterPage() {
-  const { user, signInWithGoogle } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [headshotFile, setHeadshotFile] = useState<File | null>(null);
+  const [headshotPreview, setHeadshotPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleHeadshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be less than 5MB');
+        return;
+      }
+      setHeadshotFile(file);
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setHeadshotPreview(previewUrl);
+    }
+  };
+
+  const removeHeadshot = () => {
+    setHeadshotFile(null);
+    if (headshotPreview) {
+      URL.revokeObjectURL(headshotPreview);
+      setHeadshotPreview(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const updateField = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -114,15 +153,35 @@ export default function RegisterPage() {
 
     setSubmitting(true);
 
-    // TODO: Save to Firestore
-    // For now, just simulate submission
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      let headshotUrl: string | null = null;
 
-    console.log('Registration data:', { ...formData, email: user.email, uid: user.uid });
-    alert('Registration submitted! (Will be saved to Firestore when configured)');
+      // Upload headshot if provided
+      if (headshotFile) {
+        const fileExtension = headshotFile.name.split('.').pop();
+        const fileName = `${user.uid}-${Date.now()}.${fileExtension}`;
+        const storageRef = ref(storage, `headshots/${fileName}`);
 
-    setSubmitting(false);
-    setSubmitted(true);
+        await uploadBytes(storageRef, headshotFile);
+        headshotUrl = await getDownloadURL(storageRef);
+      }
+
+      // Save registration to Firestore
+      await addDoc(collection(db, 'registrations'), {
+        ...formData,
+        email: user.email,
+        uid: user.uid,
+        headshotUrl,
+        createdAt: serverTimestamp()
+      });
+
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Error submitting registration:', error);
+      alert('Failed to submit registration. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Not logged in - show sign in prompt
@@ -136,14 +195,14 @@ export default function RegisterPage() {
             </div>
             <h1 className="text-2xl font-bold text-white mb-3">Sign In Required</h1>
             <p className="text-slate-400 mb-6">
-              Please sign in with your Google account to register for the Baja Tour 2025.
+              Please sign in to register for the Baja Tour 2026.
             </p>
             <button
-              onClick={signInWithGoogle}
+              onClick={() => navigate('/login')}
               className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
             >
               <LogIn className="h-5 w-5" />
-              Sign In with Google
+              Create Account / Sign In
             </button>
           </div>
         </div>
@@ -202,6 +261,60 @@ export default function RegisterPage() {
             </div>
 
             <div className="grid gap-4">
+              {/* Headshot Upload */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Profile Photo
+                </label>
+                <p className="text-xs text-slate-500 mb-3">
+                  Upload a headshot so other riders can recognize you. This will be shown on the Participants page.
+                </p>
+                <div className="flex items-center gap-4">
+                  {/* Preview */}
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden border-2 border-slate-600">
+                      {headshotPreview ? (
+                        <img
+                          src={headshotPreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-10 w-10 text-slate-400" />
+                      )}
+                    </div>
+                    {headshotPreview && (
+                      <button
+                        type="button"
+                        onClick={removeHeadshot}
+                        className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center hover:bg-red-700 transition-colors"
+                      >
+                        <X className="h-4 w-4 text-white" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Upload Button */}
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleHeadshotChange}
+                      className="hidden"
+                      id="headshot-upload"
+                    />
+                    <label
+                      htmlFor="headshot-upload"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg cursor-pointer transition-colors"
+                    >
+                      <Camera className="h-4 w-4" />
+                      {headshotPreview ? 'Change Photo' : 'Upload Photo'}
+                    </label>
+                    <p className="text-xs text-slate-500 mt-2">JPG, PNG up to 5MB</p>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Full Name *
