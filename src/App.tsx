@@ -14,6 +14,7 @@ import DiscussionPage from './pages/DiscussionPage';
 import ParticipantsPage from './pages/ParticipantsPage';
 import FAQPage from './pages/FAQPage';
 import RegisterPage from './pages/RegisterPage';
+import LoginPage from './pages/LoginPage';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <Route path="/participants" element={<ParticipantsPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/login" element={<LoginPage />} />
           </Routes>
         </Layout>
       </BrowserRouter>

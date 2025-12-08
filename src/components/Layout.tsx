@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Home,
@@ -36,9 +36,14 @@ const navItems = [
 ];
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, signInWithGoogle, logout, loading } = useAuth();
+  const { user, logout, loading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignIn = () => {
+    navigate('/login');
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -102,11 +107,11 @@ export default function Layout({ children }: LayoutProps) {
                     </div>
                   ) : (
                     <button
-                      onClick={signInWithGoogle}
+                      onClick={handleSignIn}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     >
                       <LogIn className="h-4 w-4" />
-                      Sign In
+                      Create Account / Sign In
                     </button>
                   )}
                 </div>
@@ -175,13 +180,13 @@ export default function Layout({ children }: LayoutProps) {
                 ) : (
                   <button
                     onClick={() => {
-                      signInWithGoogle();
+                      handleSignIn();
                       setMobileMenuOpen(false);
                     }}
                     className="flex items-center gap-3 w-full px-4 py-3 bg-blue-600 text-white rounded-lg"
                   >
                     <LogIn className="h-5 w-5" />
-                    <span>Sign In with Google</span>
+                    <span>Create Account / Sign In</span>
                   </button>
                 )}
               </div>

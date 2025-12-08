@@ -5,7 +5,7 @@
  * Shows trip overview, countdown, and key highlights.
  */
 
-import { Calendar, MapPin, Users, Bike, Mountain, Sun } from 'lucide-react';
+import { MapPin, Users, Bike, Mountain, Sun } from 'lucide-react';
 import { tripSummary, totalMiles } from '../data/itinerary';
 import { Link } from 'react-router-dom';
 
@@ -28,29 +28,52 @@ export default function HomePage() {
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
             Baja California
-            <span className="block text-blue-400">Adventure 2025</span>
+            <span className="block text-blue-400">Adventure 2026</span>
           </h1>
 
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
-            Join us for an unforgettable 9-day motorcycle journey through Baja California,
-            ending in the dramatic landscapes of Death Valley.
-          </p>
+          <div className="bg-slate-800/80 rounded-xl border border-slate-700 p-6 lg:p-8 max-w-3xl mx-auto mb-8">
+            <div className="text-slate-300 space-y-4 text-left">
+              <p>
+                We're planning a group ride to Baja California in advance of the{' '}
+                <span className="text-white font-medium">BMW Motorcycle Club of Northern California's annual Death Valley Trip</span>{' '}
+                at the end of March.
+              </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/itinerary"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              <MapPin className="h-5 w-5" />
-              View Itinerary
-            </Link>
-            <Link
-              to="/participants"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors"
-            >
-              <Users className="h-5 w-5" />
-              Meet the Riders
-            </Link>
+              <p>
+                This is <span className="text-blue-400 font-medium">not a club ride</span> but organized to help club members
+                who want to experience Baja on a motorcycle with some of the planning and logistics handled.
+              </p>
+
+              <p>
+                This is <span className="text-blue-400 font-medium">not a supported ride</span> but one that enables riders
+                to meet up at the end of each day in an established location. Some nights there will be organized meals,
+                others you're on your own — it's somewhat dependent on the locations we stay at and the size of the group.
+              </p>
+
+              <p>
+                It's not a commercial group tour, just your fellow riders helping organize it for their friends.
+              </p>
+
+              <p className="text-white font-medium text-lg pt-2">
+                If this sounds good, keep reading and sign up!
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                to="/itinerary"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                <MapPin className="h-5 w-5" />
+                View Initial Itinerary
+              </Link>
+              <Link
+                to="/faq"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors"
+              >
+                Read the FAQ
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -133,99 +156,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Route Overview */}
-      <section className="py-16 bg-slate-800/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">Route Overview</h2>
-
-          <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-            <div className="grid md:grid-cols-2">
-              {/* Map placeholder */}
-              <div className="bg-slate-900 h-64 md:h-auto flex items-center justify-center">
-                <div className="text-center text-slate-500">
-                  <MapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Interactive map coming soon</p>
-                  <Link to="/itinerary" className="text-blue-400 hover:underline text-sm mt-2 block">
-                    View detailed itinerary →
-                  </Link>
-                </div>
-              </div>
-
-              {/* Route details */}
-              <div className="p-6 lg:p-8">
-                <h3 className="text-xl font-semibold text-white mb-6">The Journey</h3>
-
-                <div className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-sm font-bold">S</span>
-                    </div>
-                    <div>
-                      <div className="text-white font-medium">Start: El Cajon, California</div>
-                      <div className="text-slate-400 text-sm">March 19, 2025</div>
-                    </div>
-                  </div>
-
-                  <div className="ml-4 border-l-2 border-dashed border-slate-600 h-8" />
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <MapPin className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-white font-medium">Baja California, Mexico</div>
-                      <div className="text-slate-400 text-sm">Ensenada → San Quintín → Guerrero Negro → San Ignacio → Loreto</div>
-                    </div>
-                  </div>
-
-                  <div className="ml-4 border-l-2 border-dashed border-slate-600 h-8" />
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-sm font-bold">E</span>
-                    </div>
-                    <div>
-                      <div className="text-white font-medium">End: Furnace Creek, Death Valley</div>
-                      <div className="text-slate-400 text-sm">March 27, 2025</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 pt-6 border-t border-slate-700">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Calendar className="h-4 w-4" />
-                    <span>9 days • {totalMiles} miles • 2 countries</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready for Adventure?</h2>
-          <p className="text-slate-400 mb-8">
-            Check out the full itinerary, connect with other riders, or browse the FAQ for trip details.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/discussion"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              Join the Discussion
-            </Link>
-            <Link
-              to="/faq"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors"
-            >
-              View FAQ
-            </Link>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

@@ -14,7 +14,8 @@ import {
   Shield,
   Wrench,
   DollarSign,
-  Tent
+  Tent,
+  Info
 } from 'lucide-react';
 
 interface FAQItem {
@@ -25,6 +26,68 @@ interface FAQItem {
 }
 
 const faqData: FAQItem[] = [
+  // About the Ride
+  {
+    id: 'about-1',
+    category: 'About the Ride',
+    question: 'What kind of tour is this?',
+    answer: `**This is NOT a paid organized tour with rider support.** It's simply a group of fellow riders helping to organize a group tour with their fellow club members.
+
+Remember: you get what you paid for, and since you're not paying the organizers, expect nothing in return! :) But they will do their best to organize a great tour of Baja to make it easier for you.`
+  },
+  {
+    id: 'about-2',
+    category: 'About the Ride',
+    question: 'Is this a group ride?',
+    answer: `**This is NOT a group ride.** All riders ride their own ride and can take the provided routes or chart their own routes. You will end up riding with small groups of riders, not a huge conga line.
+
+If you don't have someone to ride with, we will help you find a group.`
+  },
+  {
+    id: 'about-3',
+    category: 'About the Ride',
+    question: 'What should I expect?',
+    answer: `You have to be easy going and go with the flow. There might be some issues - you might have to share a room with someone who snores. Don't complain, consider it part of the adventure!
+
+**Prima donnas or those expecting a "tour" experience should consider alternatives.**
+
+Everyone is a participant, not a customer - keep that in mind.`
+  },
+  {
+    id: 'about-4',
+    category: 'About the Ride',
+    question: 'Should I expect other riders to help me?',
+    answer: `While all riders will be gracious and likely help their fellow riders, **do not expect other riders to fix your problems.** Be self-sufficient and well prepared.
+
+The organizers and riders will appreciate you more and be more likely to help you in the event there are problems.`
+  },
+  {
+    id: 'about-5',
+    category: 'About the Ride',
+    question: 'How do meals and accommodations work?',
+    answer: `Our preference is to have everyone handle their own. If the committed group is small (less than 10), we will roll that way with minimal planning.
+
+If larger, it will likely require more planning and pre-reservations. In that case, the organizers will make reservations for participants that opt in to the group plan.
+
+**If you opt in to the group plan:**
+• Be easy going and flexible
+• Organizers will do their best to offer a great experience with comfortable accommodations and good group meals
+• Remember they are not professional tour guides, just fellow riders like you
+• Group meals will be shared with a shared menu and fixed cost
+• If you want exact costs allocated to you, consider opting out of the group plan
+
+This approach makes it easier to organize and manage.`
+  },
+  {
+    id: 'about-6',
+    category: 'About the Ride',
+    question: 'Is this ride right for me?',
+    answer: `We have done this ride a few times now and thankfully it's always worked out - everyone was on the same page and had a great time.
+
+If you don't understand this vibe or have questions, let us know and we are happy to give you a call and provide more details to help you decide if this is the ride for you.
+
+**But please read the FAQs first!**`
+  },
   // Documents & Requirements
   {
     id: '1',
@@ -32,7 +95,7 @@ const faqData: FAQItem[] = [
     question: 'What documents do I need to enter Mexico?',
     answer: `You'll need the following documents:
 • Valid passport (must be valid for at least 6 months beyond your travel dates)
-• Vehicle registration (original, not a copy)
+• Vehicle registration (a copy is fine)
 • Valid driver's license
 • Mexican vehicle permit (obtained at the border)
 • Proof of Mexican motorcycle insurance (US insurance is not valid in Mexico)
@@ -57,64 +120,61 @@ Coverage should include liability, collision, and medical. Expect to pay around 
     question: 'Do I need a special license to ride in Mexico?',
     answer: `Your valid US motorcycle endorsement/license is recognized in Mexico. However, it must be current and valid. International Driving Permits (IDP) are not required but can be helpful as they provide a Spanish translation of your license. You can obtain an IDP from AAA for about $20.`
   },
-  // Bike Preparation
   {
     id: '4',
-    category: 'Bike Preparation',
-    question: 'What type of motorcycle is suitable for this trip?',
-    answer: `This trip is designed for adventure/dual-sport motorcycles. Most participants ride BMW GS models, but any reliable adventure bike works:
-• BMW GS series (all sizes welcome)
-• KTM Adventure
-• Honda Africa Twin
-• Yamaha Tenere
-• Triumph Tiger
-
-The roads are primarily paved (Highway 1) with some unpaved sections. A bike with at least 19" front wheel and capable of handling some loose gravel is ideal. Street-only bikes are not recommended.`
+    category: 'Documents & Requirements',
+    question: 'Can I get more info about traveling in Baja?',
+    answer: `Yes! Check out https://www.bajabound.com/ for great info about traveling in Baja as well as links to purchase motorcycle insurance.`
   },
+  // Bike Preparation
   {
     id: '5',
     category: 'Bike Preparation',
-    question: 'What maintenance should I do before the trip?',
-    answer: `Before departure, ensure your bike has:
-• Fresh oil and filter
-• New or good-condition tires (at least 50% tread)
-• Inspected brake pads and fluid
-• Checked chain/final drive
-• Tested battery
-• Functional lights and signals
-• Adjusted suspension for luggage weight
+    question: 'What type of motorcycle is suitable for this trip?',
+    answer: `This trip is designed for BMW motorcycles. Most participants ride BMW GS models of all sizes.
 
-We'll do a group bike check on Day 1 in El Cajon. Bring basic tools and spare parts (tube/plug kit, clutch/brake levers, fuses).`
+While all riders can take their own routes, the provided route is all paved and suitable for all motorcycles. However, short portions of dirt and sand are unavoidable, especially when getting to camps and hotels.`
+  },
+  {
+    id: '6',
+    category: 'Bike Preparation',
+    question: 'What maintenance should I do before the trip?',
+    answer: `Ensure your bike is well maintained and in good working order. This includes:
+• Fresh tires with good tread
+• A properly adjusted chain
+• A good battery - if it's getting old, get it replaced!
+• Functioning lights and signals
+• All leaks fixed
+• Fresh oil and filter
+
+We'll do a group bike check on Day 1 in El Cajon.`
   },
   // Costs & Logistics
   {
-    id: '6',
+    id: '7',
     category: 'Costs & Logistics',
     question: 'What is the approximate cost of the trip?',
     answer: `Estimated costs (per person):
-• Hotels: $100-150/night × 8 nights = $800-1,200
-• Fuel: ~$200-300 (gas is similar price to US)
-• Food: $40-60/day × 9 days = $360-540
-• Mexican insurance: $100-150 (for 9 days)
-• Border crossing fees: ~$50
-• Miscellaneous: $200-300
+• Hotels (shared room): $50-100/night, average ~$85/night
+• Camping: ~$15/night
+• Food: ~$40/day
+• Fuel: ~$250 (assuming 40 MPG, gas priced similar to California)
+• Insurance and other fees: $250-500 depending on coverage
 
-**Total estimate: $1,700 - $2,500**
-
-This doesn't include airfare to/from San Diego or any optional excursions (whale watching, etc.). Costs can be reduced by sharing rooms.`
-  },
-  {
-    id: '7',
-    category: 'Costs & Logistics',
-    question: 'How will accommodations be handled?',
-    answer: `We have reserved blocks of rooms at each overnight location. Hotels are mid-range, clean, and motorcycle-friendly with secure parking. Room types include:
-• Single occupancy (higher cost)
-• Shared/double occupancy (split cost with another rider)
-
-You'll book and pay for your own rooms directly. We'll provide contact info and reservation codes for each hotel. Please book early as March is prime season in Baja.`
+This doesn't include any excursions like whale watching or the cost to get to the border.`
   },
   {
     id: '8',
+    category: 'Costs & Logistics',
+    question: 'How will accommodations be handled?',
+    answer: `How we handle reservations is TBD and depends on how many people commit. Last time we did the ride we organized the hotels and used the deposit to pay for them. This was necessary to secure sufficient rooms in advance and made it easy for everyone but was a lot of work.
+
+If we do this again, all riders can choose to participate in the group plans which will be a combination of hotels and camping, but can always opt out and manage their own accommodations.
+
+**Important:** Once you select an option it cannot be changed as we will be reserving accommodations using the deposit you submit with your registration.`
+  },
+  {
+    id: '9',
     category: 'Costs & Logistics',
     question: 'What about fuel availability?',
     answer: `Fuel (PEMEX stations) is readily available along Highway 1. The longest stretch without fuel is about 120 miles. Most bikes can handle this easily, but:
@@ -125,7 +185,7 @@ You'll book and pay for your own rooms directly. We'll provide contact info and 
   },
   // Safety & Medical
   {
-    id: '9',
+    id: '10',
     category: 'Safety & Medical',
     question: 'Is it safe to ride in Mexico?',
     answer: `Baja California is one of the safest regions in Mexico for tourists. The Transpeninsular Highway (Highway 1) is well-traveled and we'll be in a group. Basic precautions:
@@ -138,7 +198,7 @@ You'll book and pay for your own rooms directly. We'll provide contact info and 
 We've led this trip multiple times without incident. The Mexican people are friendly and welcoming to motorcyclists.`
   },
   {
-    id: '10',
+    id: '11',
     category: 'Safety & Medical',
     question: 'What medical preparations should I make?',
     answer: `Before the trip:
@@ -146,18 +206,17 @@ We've led this trip multiple times without incident. The Mexican people are frie
 • Bring any prescription medications (keep in original containers)
 • Get Hepatitis A vaccine if you haven't already
 • Pack a basic first aid kit
+• Consider getting medical evacuation insurance such as https://medjetassist.com/
 
 Each rider should have:
 • Personal first aid supplies
 • Emergency contact information
 • Medical ID bracelet if applicable
-• Copies of health insurance cards
-
-We'll have a group first aid kit and satellite communicator for emergencies.`
+• Copies of health insurance cards`
   },
   // Packing & Gear
   {
-    id: '11',
+    id: '12',
     category: 'Packing & Gear',
     question: 'What should I pack?',
     answer: `Essential packing list:
@@ -185,10 +244,13 @@ We'll have a group first aid kit and satellite communicator for emergencies.`
 • Charging cables
 • Satellite communicator (optional but recommended)
 
-Pack light! Hard cases or soft bags should total under 50 lbs.`
+**Camping Gear:**
+• Tent, sleeping bag, pad (if camping)
+
+The weather should be perfect but check before you leave.`
   },
   {
-    id: '12',
+    id: '13',
     category: 'Packing & Gear',
     question: 'What navigation/communication tools are recommended?',
     answer: `**Navigation:**
@@ -199,10 +261,7 @@ Pack light! Hard cases or soft bags should total under 50 lbs.`
 **Communication:**
 • Cell service is spotty in Baja - have offline capabilities
 • WhatsApp works best for group communication
-• Consider a Garmin InReach or similar satellite communicator
-• We'll use Sena/Cardo intercoms for group communication while riding
-
-Mexico carriers: Telcel has best coverage. Consider a local SIM or international plan.`
+• Consider a Garmin InReach or similar satellite communicator`
   }
 ];
 
@@ -210,6 +269,7 @@ Mexico carriers: Telcel has best coverage. Consider a local SIM or international
 const categories = [...new Set(faqData.map(item => item.category))];
 
 const categoryIcons: Record<string, typeof HelpCircle> = {
+  'About the Ride': Info,
   'Documents & Requirements': FileText,
   'Bike Preparation': Wrench,
   'Costs & Logistics': DollarSign,
@@ -218,7 +278,7 @@ const categoryIcons: Record<string, typeof HelpCircle> = {
 };
 
 export default function FAQPage() {
-  const [expandedId, setExpandedId] = useState<string | null>('1');
+  const [expandedId, setExpandedId] = useState<string | null>('about-1');
 
   const toggleQuestion = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -231,7 +291,7 @@ export default function FAQPage() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-white mb-4">Frequently Asked Questions</h1>
           <p className="text-slate-400">
-            Everything you need to know about the Baja Tour 2025
+            Everything you need to know about the Baja Tour 2026
           </p>
         </div>
 
