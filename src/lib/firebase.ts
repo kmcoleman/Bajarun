@@ -10,12 +10,12 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCQqbWD18gGQzUys2ABHaRl3d7tBXak31k",
-  authDomain: "baja-tour-2026.firebaseapp.com",
-  projectId: "baja-tour-2026",
-  storageBucket: "baja-tour-2026.firebasestorage.app",
-  messagingSenderId: "175968947390",
-  appId: "1:175968947390:web:77a3d189985d61b807a2ef"
+  apiKey: "AIzaSyAQz1vuHv_dvf30dsWYY8Ox0-5QLtrK26I",
+  authDomain: "bajarun-2026.firebaseapp.com",
+  projectId: "bajarun-2026",
+  storageBucket: "bajarun-2026.firebasestorage.app",
+  messagingSenderId: "73531449020",
+  appId: "1:73531449020:web:981ec8300eb4fbfa077ab9"
 };
 
 // Initialize Firebase
