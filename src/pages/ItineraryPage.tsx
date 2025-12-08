@@ -18,7 +18,8 @@ import {
   Star,
   Calendar,
   Tent,
-  ExternalLink
+  ExternalLink,
+  Info
 } from 'lucide-react';
 import { itineraryData, tripSummary, totalMiles, type DayItinerary } from '../data/itinerary';
 import RouteMap from '../components/RouteMap';
@@ -54,6 +55,16 @@ export default function ItineraryPage() {
               <Hotel className="h-5 w-5 text-blue-400" />
               <span>{tripSummary.totalDays - 1} nights</span>
             </div>
+          </div>
+
+          {/* Draft Notice */}
+          <div className="mt-8 max-w-2xl mx-auto p-4 bg-amber-600/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+            <Info className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-amber-200/80 text-sm text-left">
+              <strong className="text-amber-300">Draft Itinerary:</strong> This itinerary is subject to change.
+              The route will be fine-tuned to focus on the best roads we can find.
+              Use this itinerary to understand the distances to be expected and where we will be each day.
+            </p>
           </div>
         </div>
 
