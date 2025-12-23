@@ -1,0 +1,2949 @@
+/**
+ * AdminPage.tsx
+ *
+ * Admin dashboard for Baja Tour organizers.
+ * Shows registration stats and allows viewing participant details.
+ * Protected by UID check - only accessible by authorized admin.
+ */
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+import { db, functions } from '../lib/firebase';
+import { collection, getDocs, doc, updateDoc, addDoc, serverTimestamp, orderBy, query, deleteDoc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import {
+  Users,
+  DollarSign,
+  Hotel,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  ChevronRight,
+  X,
+  Phone,
+  Mail,
+  MapPin,
+  Bike,
+  AlertTriangle,
+  Shield,
+  Save,
+  Send,
+  Eye,
+  AlertCircle,
+  Megaphone,
+  Trash2,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Tent,
+  UserX,
+  UtensilsCrossed,
+  Coffee,
+  UserRound,
+  Compass,
+  BedDouble,
+  Receipt,
+  Plus,
+  CreditCard,
+  Banknote,
+  FileText
+} from 'lucide-react';
+import type { NightConfig, UserSelections, OptionalActivity, PaymentMethod } from '../types/eventConfig';
+import { TRIP_NIGHTS } from '../types/eventConfig';
+
+// Admin UID - only this user can access the admin page
+const ADMIN_UID = 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+
+interface Registration {
+  id: string;
+  uid: string;
+  fullName: string;
+  nickname: string;
+  tagline: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  phone: string;
+  email: string;
+  emergencyName: string;
+  emergencyPhone: string;
+  emergencyRelation: string;
+  medicalConditions: string;
+  bikeModel: string;
+  bikeYear: string;
+  yearsRiding: string;
+  offRoadExperience: string;
+  bajaTourExperience: string;
+  repairExperience: string;
+  spanishLevel: string;
+  passportValid: boolean;
+  hasPillion: boolean;
+  accommodationPreference: string;
+  flexibleAccommodations: boolean;
+  okSharingSameGender: boolean;
+  okLessIdeal: boolean;
+  okGroupMeals: boolean;
+  okHotelCost: boolean;
+  participateGroup: boolean | null;
+  tshirtSize: string;
+  hasGarminInreach: boolean;
+  hasToolkit: boolean;
+  skillMechanical: boolean;
+  skillMedical: boolean;
+  skillPhotography: boolean;
+  skillOther: boolean;
+  skillOtherText: string;
+  anythingElse: string;
+  headshotUrl: string | null;
+  depositPaid: number;
+  depositRequired: number;
+  amtCollected: number;
+  createdAt: any;
+  latitude?: number;
+  longitude?: number;
+}
+
+export default function AdminPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPerson, setSelectedPerson] = useState<Registration | null>(null);
+  const [editingDeposit, setEditingDeposit] = useState(false);
+  const [depositAmount, setDepositAmount] = useState<string>('');
+  const [savingDeposit, setSavingDeposit] = useState(false);
+
+  // Email state
+  const [activeTab, setActiveTab] = useState<'registrations' | 'email' | 'announcements' | 'emailList' | 'accommodations' | 'ledger' | 'roster'>('registrations');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [emailRecipients, setEmailRecipients] = useState<'all' | 'selected'>('all');
+  const [selectedRecipientUids, setSelectedRecipientUids] = useState<string[]>([]);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ sent: number; failed: number } | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Announcement state
+  interface Announcement {
+    id: string;
+    title: string;
+    message: string;
+    priority: 'normal' | 'important' | 'urgent';
+    createdAt: Timestamp;
+    createdBy: string;
+  }
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [announcementPriority, setAnnouncementPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
+  const [postingAnnouncement, setPostingAnnouncement] = useState(false);
+
+  // Record Deposit Modal state
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [depositModalPerson, setDepositModalPerson] = useState<Registration | null>(null);
+  const [depositModalAmount, setDepositModalAmount] = useState<string>('');
+  const [recordingDeposit, setRecordingDeposit] = useState(false);
+
+  // Accommodation view state
+  interface UserAccommodationData {
+    odUserId: string;
+    odName: string;
+    odHeadshotUrl: string | null;
+    selections: UserSelections;
+    preferredRoommate: string | null;
+    dietaryRestrictions: string | null;
+  }
+  const [userAccommodations, setUserAccommodations] = useState<UserAccommodationData[]>([]);
+  const [nightConfigs, setNightConfigs] = useState<{ [key: string]: NightConfig }>({});
+  const [expandedNights, setExpandedNights] = useState<Set<string>>(new Set());
+  const [loadingAccommodations, setLoadingAccommodations] = useState(false);
+
+  // Ledger state
+  interface LedgerCharge {
+    id: string;
+    type: 'accommodation' | 'meal' | 'fee' | 'adjustment';
+    description: string;
+    amount: number;
+    date: Date;
+    postedBy: string;
+    nightKey?: string;
+  }
+  interface LedgerPayment {
+    id: string;
+    amount: number;
+    date: Date;
+    method: PaymentMethod;
+    recordedBy: string;
+    note?: string;
+  }
+  const [selectedLedgerUserId, setSelectedLedgerUserId] = useState<string | null>(null);
+  const [ledgerCharges, setLedgerCharges] = useState<LedgerCharge[]>([]);
+  const [ledgerPayments, setLedgerPayments] = useState<LedgerPayment[]>([]);
+  const [loadingLedger, setLoadingLedger] = useState(false);
+  const [showChargeModal, setShowChargeModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [expandedLedgerSections, setExpandedLedgerSections] = useState<Set<string>>(new Set(['estimates', 'charges', 'payments']));
+
+  // Geocoding state
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
+
+  // All riders ledger totals
+  const [allRidersTotals, setAllRidersTotals] = useState<{
+    totalPayments: number;
+    totalPostedCharges: number;
+    totalEstimatedCharges: number;
+    loaded: boolean;
+  }>({ totalPayments: 0, totalPostedCharges: 0, totalEstimatedCharges: 0, loaded: false });
+
+  // Charge modal state
+  const [newChargeType, setNewChargeType] = useState<'accommodation' | 'meal' | 'fee' | 'adjustment'>('fee');
+  const [newChargeDescription, setNewChargeDescription] = useState('');
+  const [newChargeAmount, setNewChargeAmount] = useState('');
+  const [newChargeNightKey, setNewChargeNightKey] = useState('');
+  const [savingCharge, setSavingCharge] = useState(false);
+
+  // Payment modal state
+  const [newPaymentAmount, setNewPaymentAmount] = useState('');
+  const [newPaymentMethod, setNewPaymentMethod] = useState<PaymentMethod>('venmo');
+  const [newPaymentNote, setNewPaymentNote] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+
+  // Check if current user is admin
+  const isAdmin = user?.uid === ADMIN_UID;
+
+  // Fetch all registrations
+  useEffect(() => {
+    async function fetchRegistrations() {
+      if (!isAdmin) return;
+
+      try {
+        const registrationsRef = collection(db, 'registrations');
+        const snapshot = await getDocs(registrationsRef);
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Registration[];
+
+        // Sort by creation date (newest first)
+        data.sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || new Date(0);
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        setRegistrations(data);
+      } catch (error) {
+        console.error('Error fetching registrations:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (!authLoading) {
+      fetchRegistrations();
+    }
+  }, [isAdmin, authLoading]);
+
+  // Fetch announcements
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const q = query(
+      collection(db, 'announcements'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Announcement[];
+      setAnnouncements(data);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin]);
+
+  // Fetch accommodations data when tab is selected (needed for Rider Prefs, Ledger, and Roster)
+  useEffect(() => {
+    async function fetchAccommodations() {
+      if (!isAdmin || (activeTab !== 'accommodations' && activeTab !== 'ledger' && activeTab !== 'roster')) return;
+      if (userAccommodations.length > 0) return; // Already loaded
+
+      setLoadingAccommodations(true);
+      try {
+        // Fetch night configs
+        const configSnap = await getDocs(query(collection(db, 'eventConfig')));
+        const pricingDoc = configSnap.docs.find(d => d.id === 'pricing');
+        if (pricingDoc?.exists()) {
+          const data = pricingDoc.data();
+          if (data.nights) {
+            setNightConfigs(data.nights);
+          }
+        }
+
+        // Fetch all users with accommodation selections
+        const usersRef = collection(db, 'users');
+        const usersSnap = await getDocs(usersRef);
+        const accommodationData: UserAccommodationData[] = [];
+
+        usersSnap.forEach((userDoc) => {
+          const userData = userDoc.data();
+          if (userData.accommodationSelections) {
+            // Find matching registration for name/photo
+            const reg = registrations.find(r => r.uid === userDoc.id);
+            accommodationData.push({
+              odUserId: userDoc.id,
+              odName: reg?.fullName || userData.displayName || 'Unknown',
+              odHeadshotUrl: reg?.headshotUrl || null,
+              selections: userData.accommodationSelections,
+              preferredRoommate: userData.preferredRoommate || null,
+              dietaryRestrictions: userData.dietaryRestrictions || null
+            });
+          }
+        });
+
+        setUserAccommodations(accommodationData);
+      } catch (error) {
+        console.error('Error fetching accommodations:', error);
+      } finally {
+        setLoadingAccommodations(false);
+      }
+    }
+
+    fetchAccommodations();
+  }, [isAdmin, activeTab, registrations]);
+
+  // Toggle night expansion
+  const toggleNight = (nightKey: string) => {
+    setExpandedNights(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nightKey)) {
+        newSet.delete(nightKey);
+      } else {
+        newSet.add(nightKey);
+      }
+      return newSet;
+    });
+  };
+
+  // Get accommodation counts for a night
+  const getAccommodationCounts = (nightKey: string) => {
+    let hotel = 0, camping = 0, own = 0, none = 0;
+    userAccommodations.forEach(user => {
+      const selection = user.selections[nightKey];
+      if (!selection?.accommodation) {
+        none++;
+      } else if (selection.accommodation === 'hotel') {
+        hotel++;
+      } else if (selection.accommodation === 'camping') {
+        camping++;
+      } else if (selection.accommodation === 'own') {
+        own++;
+      }
+    });
+    return { hotel, camping, own, none, total: userAccommodations.length };
+  };
+
+  // Get sorted users for a night (hotel first, then camping, then own)
+  const getSortedUsersForNight = (nightKey: string) => {
+    return [...userAccommodations].sort((a, b) => {
+      const aAccom = a.selections[nightKey]?.accommodation || 'zzz';
+      const bAccom = b.selections[nightKey]?.accommodation || 'zzz';
+      const order = { hotel: 1, camping: 2, own: 3, zzz: 4 };
+      return (order[aAccom as keyof typeof order] || 4) - (order[bAccom as keyof typeof order] || 4);
+    });
+  };
+
+  // Get roommate name by ID
+  const getRoommateName = (odUserId: string | null) => {
+    if (!odUserId) return null;
+    const reg = registrations.find(r => r.uid === odUserId);
+    return reg?.fullName || null;
+  };
+
+  // Load ledger data when rider selected
+  useEffect(() => {
+    async function loadLedger() {
+      if (!selectedLedgerUserId || !isAdmin) return;
+
+      setLoadingLedger(true);
+      try {
+        // Load charges
+        const chargesRef = collection(db, 'ledger', selectedLedgerUserId, 'charges');
+        const chargesSnap = await getDocs(query(chargesRef, orderBy('date', 'desc')));
+        const charges: LedgerCharge[] = chargesSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          date: doc.data().date?.toDate() || new Date()
+        })) as LedgerCharge[];
+        setLedgerCharges(charges);
+
+        // Load payments
+        const paymentsRef = collection(db, 'ledger', selectedLedgerUserId, 'payments');
+        const paymentsSnap = await getDocs(query(paymentsRef, orderBy('date', 'desc')));
+        const payments: LedgerPayment[] = paymentsSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          date: doc.data().date?.toDate() || new Date()
+        })) as LedgerPayment[];
+        setLedgerPayments(payments);
+      } catch (error) {
+        console.error('Error loading ledger:', error);
+      } finally {
+        setLoadingLedger(false);
+      }
+    }
+
+    loadLedger();
+  }, [selectedLedgerUserId, isAdmin]);
+
+  // Load all riders totals when ledger tab is active
+  useEffect(() => {
+    async function loadAllRidersTotals() {
+      if (!isAdmin || activeTab !== 'ledger') return;
+      if (allRidersTotals.loaded) return; // Already loaded
+
+      try {
+        let totalPayments = 0;
+        let totalPostedCharges = 0;
+
+        // Load all ledger data for all users
+        for (const reg of registrations) {
+          // Load charges for this user
+          const chargesRef = collection(db, 'ledger', reg.uid, 'charges');
+          const chargesSnap = await getDocs(chargesRef);
+          chargesSnap.forEach(doc => {
+            totalPostedCharges += doc.data().amount || 0;
+          });
+
+          // Load payments for this user
+          const paymentsRef = collection(db, 'ledger', reg.uid, 'payments');
+          const paymentsSnap = await getDocs(paymentsRef);
+          paymentsSnap.forEach(doc => {
+            totalPayments += doc.data().amount || 0;
+          });
+        }
+
+        // Calculate total estimated charges from all users' selections
+        let totalEstimatedCharges = 0;
+        for (const userData of userAccommodations) {
+          TRIP_NIGHTS.forEach(night => {
+            const selection = userData.selections[night.key];
+            const config = nightConfigs[night.key];
+            if (!selection || !config) return;
+
+            // Accommodation
+            if (selection.accommodation === 'hotel' && config.hotelAvailable) {
+              let hotelCost = config.hotelCost || 0;
+              if (selection.prefersSingleRoom && config.singleRoomAvailable) {
+                hotelCost = hotelCost * 2;
+              }
+              totalEstimatedCharges += hotelCost;
+            } else if (selection.accommodation === 'camping' && config.campingAvailable) {
+              totalEstimatedCharges += config.campingCost || 0;
+            }
+
+            // Dinner
+            if (selection.dinner && config.dinnerAvailable) {
+              totalEstimatedCharges += config.dinnerCost || 0;
+            }
+
+            // Breakfast
+            if (selection.breakfast && config.breakfastAvailable) {
+              totalEstimatedCharges += config.breakfastCost || 0;
+            }
+
+            // Optional activities
+            if (selection.optionalActivitiesInterested && config.optionalActivities) {
+              selection.optionalActivitiesInterested.forEach(actId => {
+                const activity = config.optionalActivities.find(a => a.id === actId);
+                if (activity) {
+                  totalEstimatedCharges += activity.cost || 0;
+                }
+              });
+            }
+          });
+        }
+
+        setAllRidersTotals({
+          totalPayments,
+          totalPostedCharges,
+          totalEstimatedCharges,
+          loaded: true
+        });
+      } catch (error) {
+        console.error('Error loading all riders totals:', error);
+      }
+    }
+
+    loadAllRidersTotals();
+  }, [isAdmin, activeTab, registrations, userAccommodations, nightConfigs, allRidersTotals.loaded]);
+
+  // Calculate estimated charges from selections
+  const calculateEstimatedCharges = (userId: string): { description: string; amount: number; nightKey?: string }[] => {
+    const userData = userAccommodations.find(u => u.odUserId === userId);
+    if (!userData) return [];
+
+    const estimates: { description: string; amount: number; nightKey?: string }[] = [];
+
+    TRIP_NIGHTS.forEach(night => {
+      const selection = userData.selections[night.key];
+      const config = nightConfigs[night.key];
+      if (!selection || !config) return;
+
+      // Accommodation
+      if (selection.accommodation === 'hotel' && config.hotelAvailable) {
+        let hotelCost = config.hotelCost || 0;
+        if (selection.prefersSingleRoom && config.singleRoomAvailable) {
+          hotelCost = hotelCost * 2; // Single room is double
+        }
+        if (hotelCost > 0) {
+          estimates.push({
+            description: `${night.label} - Hotel${selection.prefersSingleRoom ? ' (Single)' : ''}`,
+            amount: hotelCost,
+            nightKey: night.key
+          });
+        }
+      } else if (selection.accommodation === 'camping' && config.campingAvailable) {
+        if (config.campingCost > 0) {
+          estimates.push({
+            description: `${night.label} - Camping`,
+            amount: config.campingCost,
+            nightKey: night.key
+          });
+        }
+      }
+
+      // Dinner
+      if (selection.dinner && config.dinnerAvailable && config.dinnerCost > 0) {
+        estimates.push({
+          description: `${night.label} - Dinner`,
+          amount: config.dinnerCost,
+          nightKey: night.key
+        });
+      }
+
+      // Breakfast
+      if (selection.breakfast && config.breakfastAvailable && config.breakfastCost > 0) {
+        estimates.push({
+          description: `${night.label} - Breakfast`,
+          amount: config.breakfastCost,
+          nightKey: night.key
+        });
+      }
+
+      // Optional activities
+      if (selection.optionalActivitiesInterested && config.optionalActivities) {
+        selection.optionalActivitiesInterested.forEach(actId => {
+          const activity = config.optionalActivities.find(a => a.id === actId);
+          if (activity && activity.cost > 0) {
+            estimates.push({
+              description: `${night.label} - ${activity.title}`,
+              amount: activity.cost,
+              nightKey: night.key
+            });
+          }
+        });
+      }
+    });
+
+    return estimates;
+  };
+
+  // Save a new charge
+  const handleSaveCharge = async () => {
+    if (!selectedLedgerUserId || !user || !newChargeDescription.trim() || !newChargeAmount) return;
+
+    setSavingCharge(true);
+    try {
+      const chargeData = {
+        type: newChargeType,
+        description: newChargeDescription.trim(),
+        amount: parseFloat(newChargeAmount),
+        date: serverTimestamp(),
+        postedBy: user.uid,
+        ...(newChargeNightKey && { nightKey: newChargeNightKey })
+      };
+
+      await addDoc(collection(db, 'ledger', selectedLedgerUserId, 'charges'), chargeData);
+
+      // Reload ledger by re-fetching
+      const chargesRef = collection(db, 'ledger', selectedLedgerUserId, 'charges');
+      const chargesSnap = await getDocs(query(chargesRef, orderBy('date', 'desc')));
+      const charges: LedgerCharge[] = chargesSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        date: d.data().date?.toDate() || new Date()
+      })) as LedgerCharge[];
+      setLedgerCharges(charges);
+
+      // Reset all riders totals to trigger reload
+      setAllRidersTotals(prev => ({ ...prev, loaded: false }));
+
+      // Reset form
+      setNewChargeType('fee');
+      setNewChargeDescription('');
+      setNewChargeAmount('');
+      setNewChargeNightKey('');
+      setShowChargeModal(false);
+    } catch (error) {
+      console.error('Error saving charge:', error);
+      alert('Failed to save charge');
+    } finally {
+      setSavingCharge(false);
+    }
+  };
+
+  // Save a new payment
+  const handleSavePayment = async () => {
+    if (!selectedLedgerUserId || !user || !newPaymentAmount) return;
+
+    setSavingPayment(true);
+    try {
+      const paymentData = {
+        amount: parseFloat(newPaymentAmount),
+        date: serverTimestamp(),
+        method: newPaymentMethod,
+        recordedBy: user.uid,
+        ...(newPaymentNote.trim() && { note: newPaymentNote.trim() })
+      };
+
+      await addDoc(collection(db, 'ledger', selectedLedgerUserId, 'payments'), paymentData);
+
+      // Reload ledger by re-fetching
+      const paymentsRef = collection(db, 'ledger', selectedLedgerUserId, 'payments');
+      const paymentsSnap = await getDocs(query(paymentsRef, orderBy('date', 'desc')));
+      const payments: LedgerPayment[] = paymentsSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        date: d.data().date?.toDate() || new Date()
+      })) as LedgerPayment[];
+      setLedgerPayments(payments);
+
+      // Reset all riders totals to trigger reload
+      setAllRidersTotals(prev => ({ ...prev, loaded: false }));
+
+      // Reset form
+      setNewPaymentAmount('');
+      setNewPaymentMethod('venmo');
+      setNewPaymentNote('');
+      setShowPaymentModal(false);
+    } catch (error) {
+      console.error('Error saving payment:', error);
+      alert('Failed to save payment');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  // Delete a charge
+  const handleDeleteCharge = async (chargeId: string) => {
+    if (!selectedLedgerUserId || !confirm('Delete this charge?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'ledger', selectedLedgerUserId, 'charges', chargeId));
+      setLedgerCharges(prev => prev.filter(c => c.id !== chargeId));
+    } catch (error) {
+      console.error('Error deleting charge:', error);
+      alert('Failed to delete charge');
+    }
+  };
+
+  // Delete a payment
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!selectedLedgerUserId || !confirm('Delete this payment?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'ledger', selectedLedgerUserId, 'payments', paymentId));
+      setLedgerPayments(prev => prev.filter(p => p.id !== paymentId));
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      alert('Failed to delete payment');
+    }
+  };
+
+  // Post announcement
+  const handlePostAnnouncement = async () => {
+    if (!announcementTitle.trim() || !announcementMessage.trim() || !user) return;
+
+    setPostingAnnouncement(true);
+    try {
+      await addDoc(collection(db, 'announcements'), {
+        title: announcementTitle.trim(),
+        message: announcementMessage.trim(),
+        priority: announcementPriority,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid
+      });
+
+      // Clear form
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+      setAnnouncementPriority('normal');
+    } catch (error) {
+      console.error('Error posting announcement:', error);
+      alert('Failed to post announcement. Please try again.');
+    } finally {
+      setPostingAnnouncement(false);
+    }
+  };
+
+  // Delete announcement
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    if (!confirm('Are you sure you want to delete this announcement?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'announcements', announcementId));
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      alert('Failed to delete announcement.');
+    }
+  };
+
+  // Open deposit modal for a registration
+  const openDepositModal = (reg: Registration, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the person
+    const requiredAmount = getRequiredDeposit(reg);
+    setDepositModalPerson(reg);
+    setDepositModalAmount(String(requiredAmount));
+    setShowDepositModal(true);
+  };
+
+  // Record deposit (save to amtCollected field)
+  const handleRecordDeposit = async () => {
+    if (!depositModalPerson) return;
+
+    setRecordingDeposit(true);
+    try {
+      const amount = parseFloat(depositModalAmount) || 0;
+      const registrationRef = doc(db, 'registrations', depositModalPerson.id);
+      await updateDoc(registrationRef, { amtCollected: amount });
+
+      // Update local state
+      setRegistrations(prev =>
+        prev.map(r => r.id === depositModalPerson.id ? { ...r, amtCollected: amount } : r)
+      );
+
+      // Update selected person if it's the same one
+      if (selectedPerson?.id === depositModalPerson.id) {
+        setSelectedPerson(prev => prev ? { ...prev, amtCollected: amount } : null);
+      }
+
+      setShowDepositModal(false);
+      setDepositModalPerson(null);
+    } catch (error) {
+      console.error('Error recording deposit:', error);
+      alert('Failed to record deposit');
+    } finally {
+      setRecordingDeposit(false);
+    }
+  };
+
+  // Save deposit amount (from detail panel edit)
+  const handleSaveDeposit = async () => {
+    if (!selectedPerson) return;
+
+    setSavingDeposit(true);
+    try {
+      const amount = parseFloat(depositAmount) || 0;
+      const registrationRef = doc(db, 'registrations', selectedPerson.id);
+      await updateDoc(registrationRef, { amtCollected: amount });
+
+      // Update local state
+      setRegistrations(prev =>
+        prev.map(r => r.id === selectedPerson.id ? { ...r, amtCollected: amount } : r)
+      );
+      setSelectedPerson(prev => prev ? { ...prev, amtCollected: amount } : null);
+      setEditingDeposit(false);
+    } catch (error) {
+      console.error('Error saving deposit:', error);
+      alert('Failed to save deposit amount');
+    } finally {
+      setSavingDeposit(false);
+    }
+  };
+
+  // Toggle recipient selection for email
+  const toggleRecipient = (uid: string) => {
+    setSelectedRecipientUids(prev =>
+      prev.includes(uid)
+        ? prev.filter(id => id !== uid)
+        : [...prev, uid]
+    );
+  };
+
+  // Select all recipients
+  const selectAllRecipients = () => {
+    setSelectedRecipientUids(registrations.map(r => r.uid));
+  };
+
+  // Deselect all recipients
+  const deselectAllRecipients = () => {
+    setSelectedRecipientUids([]);
+  };
+
+  // Send bulk email
+  const handleSendEmail = async () => {
+    if (!emailSubject.trim()) {
+      setEmailError('Subject is required');
+      return;
+    }
+    if (!emailBody.trim()) {
+      setEmailError('Message body is required');
+      return;
+    }
+    if (emailRecipients === 'selected' && selectedRecipientUids.length === 0) {
+      setEmailError('Please select at least one recipient');
+      return;
+    }
+
+    const recipientCount = emailRecipients === 'all'
+      ? registrations.length
+      : selectedRecipientUids.length;
+
+    const confirmMessage = `Are you sure you want to send this email to ${recipientCount} participant${recipientCount !== 1 ? 's' : ''}?`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setSendingEmail(true);
+    setEmailError(null);
+    setEmailResult(null);
+
+    try {
+      const sendBulkEmailFn = httpsCallable(functions, 'sendBulkEmail');
+      const response = await sendBulkEmailFn({
+        subject: emailSubject,
+        body: emailBody,
+        recipientUids: emailRecipients === 'all' ? 'all' : selectedRecipientUids
+      });
+
+      const data = response.data as { sent: number; failed: number; errors?: string[] };
+      setEmailResult({ sent: data.sent, failed: data.failed });
+
+      if (data.errors && data.errors.length > 0) {
+        console.warn('Some emails failed:', data.errors);
+      }
+    } catch (err: any) {
+      console.error('Error sending email:', err);
+      setEmailError(err.message || 'Failed to send email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  // Show loading state
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+      </div>
+    );
+  }
+
+  // Access denied if not admin
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
+          <p className="text-slate-400">You don't have permission to view this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate stats
+  const totalRegistrations = registrations.length;
+  const groupParticipants = registrations.filter(r => r.participateGroup === true).length;
+  const independentRiders = registrations.filter(r => r.participateGroup === false).length;
+  const undecided = registrations.filter(r => r.participateGroup === null).length;
+  // Helper function to get required deposit
+  // Uses stored depositRequired if available, otherwise calculates from current rates
+  // This ensures existing registrations keep their original quoted price
+  const getRequiredDeposit = (reg: Registration) => {
+    // Use stored value if it exists
+    if (reg.depositRequired && reg.depositRequired > 0) {
+      return reg.depositRequired;
+    }
+    // Fallback: calculate from current rates (for old registrations)
+    const base = reg.participateGroup ? 500 : 100;
+    return reg.hasPillion ? base * 2 : base;
+  };
+
+  // Geocode all participants and save coordinates to their records
+  const geocodeAllParticipants = async () => {
+    const toGeocode = registrations.filter(r => r.zipCode && !r.latitude);
+    if (toGeocode.length === 0) {
+      alert('All participants already have coordinates saved!');
+      return;
+    }
+
+    setGeocoding(true);
+    setGeocodeProgress({ done: 0, total: toGeocode.length });
+
+    for (let i = 0; i < toGeocode.length; i++) {
+      const reg = toGeocode[i];
+      try {
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(reg.zipCode)}&country=US&format=json&limit=1`,
+          {
+            headers: { 'User-Agent': 'BajaTour2026Website' },
+            signal: controller.signal
+          }
+        );
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            const latitude = parseFloat(data[0].lat);
+            const longitude = parseFloat(data[0].lon);
+
+            // Save to Firestore
+            const registrationRef = doc(db, 'registrations', reg.id);
+            await updateDoc(registrationRef, { latitude, longitude });
+            console.log(`Geocoded ${reg.fullName}: ${latitude}, ${longitude}`);
+          }
+        }
+
+        // Respect rate limits - wait between requests
+        await new Promise(resolve => setTimeout(resolve, 1100)); // Nominatim allows 1 req/sec
+      } catch (error) {
+        console.error(`Failed to geocode ${reg.fullName}:`, error);
+      }
+
+      setGeocodeProgress({ done: i + 1, total: toGeocode.length });
+    }
+
+    setGeocoding(false);
+    alert('Geocoding complete! Refresh the page to see updated data.');
+  };
+
+  const totalDepositCollected = registrations.reduce((sum, r) => sum + (r.amtCollected || 0), 0);
+  const totalDepositExpected = registrations.reduce((sum, r) => {
+    const required = getRequiredDeposit(r);
+    return sum + required;
+  }, 0);
+  const preferCamping = registrations.filter(r => r.accommodationPreference === 'camping').length;
+  const preferHotels = registrations.filter(r => r.accommodationPreference === 'hotels').length;
+  const preferEither = registrations.filter(r => r.accommodationPreference === 'either').length;
+
+  // Helper to format experience labels
+  const formatExperience = (value: string) => {
+    const labels: Record<string, string> = {
+      'less1': 'Less than 1 year',
+      '1to5': '1-5 years',
+      '5to10': '5-10 years',
+      '10plus': '10+ years',
+      'none': 'None',
+      'beginner': 'Beginner',
+      'intermediate': 'Intermediate',
+      'advanced': 'Advanced',
+      'no': 'Never',
+      'once': 'Once',
+      'twice': 'Twice',
+      'many': 'Many times',
+      'basic': 'Basic',
+      'comfortable': 'Comfortable',
+      'macgyver': 'MacGyver level',
+      'gringo': 'Gringo (none)',
+      'read': 'Can read signs',
+      'simple': 'Simple conversation',
+      'fluent': 'Fluent'
+    };
+    return labels[value] || value;
+  };
+
+  return (
+    <div className="min-h-screen py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
+          <p className="text-slate-400">Manage Baja Tour 2026 registrations</p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('registrations')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'registrations'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="h-4 w-4 inline mr-2" />
+            Registrations
+          </button>
+          <button
+            onClick={() => setActiveTab('email')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'email'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Mail className="h-4 w-4 inline mr-2" />
+            Send Email
+          </button>
+          <button
+            onClick={() => setActiveTab('announcements')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'announcements'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Megaphone className="h-4 w-4 inline mr-2" />
+            Announcements
+          </button>
+          <button
+            onClick={() => setActiveTab('emailList')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'emailList'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Mail className="h-4 w-4 inline mr-2" />
+            Email List
+          </button>
+          <button
+            onClick={() => setActiveTab('accommodations')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'accommodations'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <BedDouble className="h-4 w-4 inline mr-2" />
+            Rider Prefs
+          </button>
+          <button
+            onClick={() => setActiveTab('ledger')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'ledger'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Receipt className="h-4 w-4 inline mr-2" />
+            Ledger
+          </button>
+          <button
+            onClick={() => setActiveTab('roster')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'roster'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <FileText className="h-4 w-4 inline mr-2" />
+            Roster
+          </button>
+
+          {/* Separator */}
+          <div className="h-6 w-px bg-slate-700 mx-2" />
+
+          {/* Config Link */}
+          <Link
+            to="/admin/nightly-config"
+            className="px-4 py-2 rounded-lg font-medium transition-colors bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Daily Config
+          </Link>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Users className="h-5 w-5 text-blue-400" />
+              <span className="text-slate-400 text-sm">Total Signups</span>
+            </div>
+            <div className="text-3xl font-bold text-white">{totalRegistrations}</div>
+          </div>
+
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <CheckCircle className="h-5 w-5 text-green-400" />
+              <span className="text-slate-400 text-sm">Group Plan</span>
+            </div>
+            <div className="text-3xl font-bold text-white">{groupParticipants}</div>
+            <div className="text-xs text-slate-500 mt-1">
+              {independentRiders} independent, {undecided} undecided
+            </div>
+          </div>
+
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <DollarSign className="h-5 w-5 text-green-400" />
+              <span className="text-slate-400 text-sm">Deposits</span>
+            </div>
+            <div className="text-3xl font-bold text-white">${totalDepositCollected}</div>
+            <div className="text-xs text-slate-500 mt-1">
+              of ${totalDepositExpected} expected
+            </div>
+          </div>
+
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Hotel className="h-5 w-5 text-purple-400" />
+              <span className="text-slate-400 text-sm">Accommodation</span>
+            </div>
+            <div className="text-sm text-white space-y-1 mt-2">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Camping:</span>
+                <span>{preferCamping}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Hotels:</span>
+                <span>{preferHotels}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Either:</span>
+                <span>{preferEither}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        {activeTab === 'registrations' && (
+          /* Registrations Tab */
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Registration List */}
+          <div className="lg:col-span-1 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div className="p-4 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Registrations</h2>
+                <button
+                  onClick={geocodeAllParticipants}
+                  disabled={geocoding}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white rounded-lg transition-colors"
+                  title="Geocode zip codes for map display"
+                >
+                  {geocoding ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      {geocodeProgress.done}/{geocodeProgress.total}
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="h-3 w-3" />
+                      Geocode
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[600px] overflow-y-auto">
+              {registrations.length === 0 ? (
+                <div className="p-8 text-center text-slate-400">
+                  No registrations yet
+                </div>
+              ) : (
+                registrations.map((reg) => {
+                  const requiredDeposit = getRequiredDeposit(reg);
+                  const depositStatus = (reg.amtCollected || 0) >= requiredDeposit;
+
+                  return (
+                    <button
+                      key={reg.id}
+                      onClick={() => {
+                        setSelectedPerson(reg);
+                        setDepositAmount(String(reg.amtCollected || 0));
+                        setEditingDeposit(false);
+                      }}
+                      className={`w-full p-4 flex items-center gap-3 hover:bg-slate-700/50 transition-colors border-b border-slate-700 text-left ${
+                        selectedPerson?.id === reg.id ? 'bg-slate-700/50' : ''
+                      }`}
+                    >
+                      {/* Avatar */}
+                      <div className="w-10 h-10 rounded-full bg-slate-600 overflow-hidden flex-shrink-0">
+                        {reg.headshotUrl ? (
+                          <img
+                            src={reg.headshotUrl}
+                            alt={reg.fullName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            {reg.fullName?.charAt(0) || '?'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white font-medium truncate">{reg.fullName}</div>
+                        <div className="text-sm text-slate-400 truncate">
+                          {reg.city}, {reg.state}
+                        </div>
+                      </div>
+
+                      {/* Status indicators and Record Deposit button */}
+                      <div className="flex items-center gap-2">
+                        {depositStatus ? (
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                        ) : (
+                          <button
+                            onClick={(e) => openDepositModal(reg, e)}
+                            className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                          >
+                            Record Deposit
+                          </button>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-slate-500" />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Detail Panel */}
+          <div className="lg:col-span-2 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            {selectedPerson ? (
+              <div className="h-full flex flex-col">
+                {/* Detail Header */}
+                <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-slate-600 overflow-hidden">
+                      {selectedPerson.headshotUrl ? (
+                        <img
+                          src={selectedPerson.headshotUrl}
+                          alt={selectedPerson.fullName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-2xl text-slate-400">
+                          {selectedPerson.fullName?.charAt(0) || '?'}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">{selectedPerson.fullName}</h2>
+                      {selectedPerson.nickname && (
+                        <p className="text-slate-400">"{selectedPerson.nickname}"</p>
+                      )}
+                      {selectedPerson.tagline && (
+                        <p className="text-sm text-slate-500 italic">{selectedPerson.tagline}</p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedPerson(null)}
+                    className="p-2 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Detail Content */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                  {/* Deposit Status */}
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-white font-semibold flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-green-400" />
+                        Deposit Status
+                      </h3>
+                      {!editingDeposit && (
+                        <button
+                          onClick={() => setEditingDeposit(true)}
+                          className="text-sm text-blue-400 hover:text-blue-300"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                    {editingDeposit ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-slate-400">$</span>
+                        <input
+                          type="number"
+                          value={depositAmount}
+                          onChange={(e) => setDepositAmount(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white"
+                        />
+                        <button
+                          onClick={handleSaveDeposit}
+                          disabled={savingDeposit}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+                        >
+                          {savingDeposit ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingDeposit(false);
+                            setDepositAmount(String(selectedPerson.amtCollected || 0));
+                          }}
+                          className="px-4 py-2 text-slate-400 hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <div className="text-slate-400">Required</div>
+                          <div className="text-white font-semibold">
+                            ${getRequiredDeposit(selectedPerson)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-400">Collected</div>
+                          <div className="text-white font-semibold">
+                            ${selectedPerson.amtCollected || 0}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-400">Balance</div>
+                          <div className={`font-semibold ${
+                            (selectedPerson.amtCollected || 0) >= getRequiredDeposit(selectedPerson)
+                              ? 'text-green-400'
+                              : 'text-amber-400'
+                          }`}>
+                            ${Math.max(0, getRequiredDeposit(selectedPerson) - (selectedPerson.amtCollected || 0))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <h3 className="text-white font-semibold mb-3">Contact Information</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-slate-400" />
+                        <a href={`mailto:${selectedPerson.email}`} className="text-blue-400 hover:text-blue-300">
+                          {selectedPerson.email}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-slate-400" />
+                        <a href={`tel:${selectedPerson.phone}`} className="text-blue-400 hover:text-blue-300">
+                          {selectedPerson.phone}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        <span className="text-slate-300">
+                          {selectedPerson.city}, {selectedPerson.state} {selectedPerson.zipCode}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Emergency Contact */}
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-400" />
+                      Emergency Contact
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Name:</span>
+                        <span className="text-white">{selectedPerson.emergencyName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Phone:</span>
+                        <a href={`tel:${selectedPerson.emergencyPhone}`} className="text-blue-400 hover:text-blue-300">
+                          {selectedPerson.emergencyPhone}
+                        </a>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Relationship:</span>
+                        <span className="text-white">{selectedPerson.emergencyRelation}</span>
+                      </div>
+                      {selectedPerson.medicalConditions && (
+                        <div className="mt-3 pt-3 border-t border-slate-700">
+                          <div className="text-slate-400 mb-1">Medical Conditions:</div>
+                          <div className="text-amber-300">{selectedPerson.medicalConditions}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Motorcycle & Experience */}
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <Bike className="h-4 w-4 text-blue-400" />
+                      Motorcycle & Experience
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-slate-400">Motorcycle</div>
+                        <div className="text-white">{selectedPerson.bikeYear} {selectedPerson.bikeModel}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Years Riding</div>
+                        <div className="text-white">{formatExperience(selectedPerson.yearsRiding)}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Off-Road Experience</div>
+                        <div className="text-white">{formatExperience(selectedPerson.offRoadExperience)}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Baja Tours</div>
+                        <div className="text-white">{formatExperience(selectedPerson.bajaTourExperience)}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Repair Skills</div>
+                        <div className="text-white">{formatExperience(selectedPerson.repairExperience)}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Spanish Level</div>
+                        <div className="text-white">{formatExperience(selectedPerson.spanishLevel)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preferences */}
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <Hotel className="h-4 w-4 text-purple-400" />
+                      Preferences
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-slate-400">Group Plan</div>
+                        <div className={`font-semibold ${
+                          selectedPerson.participateGroup === true ? 'text-green-400' :
+                          selectedPerson.participateGroup === false ? 'text-amber-400' : 'text-slate-400'
+                        }`}>
+                          {selectedPerson.participateGroup === true ? 'Yes' :
+                           selectedPerson.participateGroup === false ? 'No' : 'Undecided'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Accommodation</div>
+                        <div className="text-white capitalize">{selectedPerson.accommodationPreference}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Has Pillion</div>
+                        <div className="text-white">{selectedPerson.hasPillion ? 'Yes' : 'No'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">T-Shirt Size</div>
+                        <div className="text-white">{selectedPerson.tshirtSize || 'Not specified'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Passport Valid</div>
+                        <div className={selectedPerson.passportValid ? 'text-green-400' : 'text-red-400'}>
+                          {selectedPerson.passportValid ? 'Yes' : 'No'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">Garmin InReach</div>
+                        <div className="text-white">{selectedPerson.hasGarminInreach ? 'Yes' : 'No'}</div>
+                      </div>
+                    </div>
+
+                    {/* Flexibility checkboxes */}
+                    <div className="mt-4 pt-4 border-t border-slate-700 space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        {selectedPerson.flexibleAccommodations ? (
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-slate-500" />
+                        )}
+                        <span className="text-slate-300">Flexible with accommodations</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedPerson.okSharingSameGender ? (
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-slate-500" />
+                        )}
+                        <span className="text-slate-300">OK sharing with same gender</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedPerson.okGroupMeals ? (
+                          <CheckCircle className="h-4 w-4 text-green-400" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-slate-500" />
+                        )}
+                        <span className="text-slate-300">OK with group meals</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Skills */}
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <h3 className="text-white font-semibold mb-3">Skills to Share</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPerson.skillMechanical && (
+                        <span className="px-3 py-1 bg-blue-600/20 text-blue-400 rounded-full text-sm">
+                          Mechanical
+                        </span>
+                      )}
+                      {selectedPerson.skillMedical && (
+                        <span className="px-3 py-1 bg-green-600/20 text-green-400 rounded-full text-sm">
+                          Medical
+                        </span>
+                      )}
+                      {selectedPerson.skillPhotography && (
+                        <span className="px-3 py-1 bg-purple-600/20 text-purple-400 rounded-full text-sm">
+                          Photography
+                        </span>
+                      )}
+                      {selectedPerson.skillOther && selectedPerson.skillOtherText && (
+                        <span className="px-3 py-1 bg-amber-600/20 text-amber-400 rounded-full text-sm">
+                          {selectedPerson.skillOtherText}
+                        </span>
+                      )}
+                      {!selectedPerson.skillMechanical && !selectedPerson.skillMedical &&
+                       !selectedPerson.skillPhotography && !selectedPerson.skillOther && (
+                        <span className="text-slate-500">None specified</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Additional Notes */}
+                  {selectedPerson.anythingElse && (
+                    <div className="bg-slate-900 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3">Additional Notes</h3>
+                      <p className="text-slate-300 whitespace-pre-line">{selectedPerson.anythingElse}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 p-8">
+                <div className="text-center">
+                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Select a registration to view details</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
+
+        {activeTab === 'email' && (
+          /* Email Tab */
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Email Composer */}
+            <div className="space-y-6">
+              {/* Recipient Selection */}
+              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Recipients</h3>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 p-3 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="recipients"
+                      checked={emailRecipients === 'all'}
+                      onChange={() => setEmailRecipients('all')}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <Users className="h-5 w-5 text-slate-400" />
+                    <span className="text-white">All Participants ({registrations.length})</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="recipients"
+                      checked={emailRecipients === 'selected'}
+                      onChange={() => setEmailRecipients('selected')}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <CheckCircle className="h-5 w-5 text-slate-400" />
+                    <span className="text-white">Selected Participants ({selectedRecipientUids.length})</span>
+                  </label>
+
+                  {emailRecipients === 'selected' && (
+                    <div className="ml-8 mt-2">
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          onClick={selectAllRecipients}
+                          className="text-sm text-blue-400 hover:text-blue-300"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-slate-600">|</span>
+                        <button
+                          onClick={deselectAllRecipients}
+                          className="text-sm text-blue-400 hover:text-blue-300"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-2">
+                        {registrations.map((reg) => (
+                          <label
+                            key={reg.id}
+                            className="flex items-center gap-3 p-2 hover:bg-slate-700/50 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedRecipientUids.includes(reg.uid)}
+                              onChange={() => toggleRecipient(reg.uid)}
+                              className="h-4 w-4 text-blue-600 rounded"
+                            />
+                            <span className="text-slate-300 text-sm">{reg.fullName}</span>
+                            <span className="text-slate-500 text-xs">({reg.email})</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Subject */}
+              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                <label className="block text-white font-semibold mb-2">Subject</label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Enter email subject..."
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Body */}
+              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                <label className="block text-white font-semibold mb-2">Message</label>
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  placeholder="Enter your message..."
+                  rows={10}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 resize-none"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Line breaks will be preserved. The recipient's first name will be automatically added to the greeting.
+                </p>
+              </div>
+
+              {/* Error */}
+              {emailError && (
+                <div className="flex items-center gap-2 p-4 bg-red-600/10 border border-red-500/30 rounded-lg text-red-400">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                  <span>{emailError}</span>
+                </div>
+              )}
+
+              {/* Success */}
+              {emailResult && (
+                <div className="flex items-center gap-2 p-4 bg-green-600/10 border border-green-500/30 rounded-lg text-green-400">
+                  <CheckCircle className="h-5 w-5 flex-shrink-0" />
+                  <span>
+                    Sent successfully to {emailResult.sent} recipient{emailResult.sent !== 1 ? 's' : ''}
+                    {emailResult.failed > 0 && ` (${emailResult.failed} failed)`}
+                  </span>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  <Eye className="h-4 w-4" />
+                  {showPreview ? 'Hide Preview' : 'Preview'}
+                </button>
+                <button
+                  onClick={handleSendEmail}
+                  disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}
+                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                >
+                  {sendingEmail ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {sendingEmail ? 'Sending...' : 'Send Email'}
+                </button>
+              </div>
+            </div>
+
+            {/* Preview */}
+            {showPreview && (
+              <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div className="bg-slate-900 px-4 py-2 border-b border-slate-700">
+                  <span className="text-sm font-medium text-slate-400">Email Preview</span>
+                </div>
+                <div className="p-6">
+                  <div className="bg-white rounded-lg overflow-hidden shadow-lg">
+                    {/* Email Header */}
+                    <div
+                      style={{
+                        background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+                        padding: '30px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <h1 style={{ color: '#ffffff', margin: 0, fontSize: '24px' }}>
+                        BMW Baja Tour 2026
+                      </h1>
+                    </div>
+
+                    {/* Email Body */}
+                    <div style={{ padding: '30px' }}>
+                      <p style={{ color: '#374151', margin: '0 0 20px 0', fontSize: '16px' }}>
+                        Hi [First Name],
+                      </p>
+                      <div
+                        style={{ color: '#374151', fontSize: '16px', lineHeight: 1.6 }}
+                        dangerouslySetInnerHTML={{
+                          __html: (emailBody || 'Message body goes here...').replace(/\n/g, '<br />'),
+                        }}
+                      />
+                    </div>
+
+                    {/* Email Footer */}
+                    <div
+                      style={{
+                        backgroundColor: '#f9fafb',
+                        padding: '20px',
+                        textAlign: 'center',
+                        borderTop: '1px solid #e5e7eb',
+                      }}
+                    >
+                      <p style={{ color: '#9ca3af', fontSize: '12px', margin: 0 }}>
+                        BMW Motorcycle Club - Baja Tour 2026
+                      </p>
+                      <p style={{ color: '#9ca3af', fontSize: '12px', margin: '10px 0 0 0' }}>
+                        March 19-27, 2026
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Announcements Tab */}
+        {activeTab === 'announcements' && (
+          <div className="space-y-6">
+            {/* Create Announcement */}
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-blue-400" />
+                Post New Announcement
+              </h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Title *</label>
+                  <input
+                    type="text"
+                    value={announcementTitle}
+                    onChange={(e) => setAnnouncementTitle(e.target.value)}
+                    placeholder="Announcement title..."
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Message *</label>
+                  <textarea
+                    value={announcementMessage}
+                    onChange={(e) => setAnnouncementMessage(e.target.value)}
+                    placeholder="Write your announcement..."
+                    rows={4}
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Priority</label>
+                  <div className="flex gap-3">
+                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      announcementPriority === 'normal'
+                        ? 'bg-slate-600/20 border-slate-500 text-white'
+                        : 'bg-slate-900 border-slate-600 text-slate-300 hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="priority"
+                        checked={announcementPriority === 'normal'}
+                        onChange={() => setAnnouncementPriority('normal')}
+                        className="sr-only"
+                      />
+                      Normal
+                    </label>
+                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      announcementPriority === 'important'
+                        ? 'bg-amber-600/20 border-amber-500 text-amber-300'
+                        : 'bg-slate-900 border-slate-600 text-slate-300 hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="priority"
+                        checked={announcementPriority === 'important'}
+                        onChange={() => setAnnouncementPriority('important')}
+                        className="sr-only"
+                      />
+                      Important
+                    </label>
+                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      announcementPriority === 'urgent'
+                        ? 'bg-red-600/20 border-red-500 text-red-300'
+                        : 'bg-slate-900 border-slate-600 text-slate-300 hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="priority"
+                        checked={announcementPriority === 'urgent'}
+                        onChange={() => setAnnouncementPriority('urgent')}
+                        className="sr-only"
+                      />
+                      Urgent
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handlePostAnnouncement}
+                  disabled={postingAnnouncement || !announcementTitle.trim() || !announcementMessage.trim()}
+                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                >
+                  {postingAnnouncement ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {postingAnnouncement ? 'Posting...' : 'Post Announcement'}
+                </button>
+              </div>
+            </div>
+
+            {/* Existing Announcements */}
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Active Announcements ({announcements.length})
+              </h3>
+
+              {announcements.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No announcements yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {announcements.map((announcement) => {
+                    const priorityColors = {
+                      normal: 'border-l-slate-500',
+                      important: 'border-l-amber-500',
+                      urgent: 'border-l-red-500'
+                    };
+                    const priorityBadge = {
+                      normal: null,
+                      important: <span className="px-2 py-0.5 bg-amber-600/20 text-amber-400 text-xs rounded">Important</span>,
+                      urgent: <span className="px-2 py-0.5 bg-red-600/20 text-red-400 text-xs rounded">Urgent</span>
+                    };
+
+                    return (
+                      <div
+                        key={announcement.id}
+                        className={`p-4 bg-slate-900/50 rounded-lg border-l-4 ${priorityColors[announcement.priority]}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="text-white font-medium">{announcement.title}</h4>
+                              {priorityBadge[announcement.priority]}
+                            </div>
+                            <p className="text-slate-400 text-sm">{announcement.message}</p>
+                            <p className="text-slate-500 text-xs mt-2">
+                              Posted {announcement.createdAt?.toDate().toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteAnnouncement(announcement.id)}
+                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-600/10 rounded transition-colors"
+                            title="Delete announcement"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Email List Tab */}
+        {activeTab === 'emailList' && (
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Mail className="h-5 w-5 text-blue-400" />
+                All Registrant Emails ({registrations.length})
+              </h3>
+              <button
+                onClick={() => {
+                  const emails = registrations.map(r => r.email).join(', ');
+                  navigator.clipboard.writeText(emails);
+                  alert('Emails copied to clipboard!');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                Copy All Emails
+              </button>
+            </div>
+
+            <p className="text-slate-400 text-sm mb-4">
+              Click the button above to copy all emails, or select and copy from the box below:
+            </p>
+
+            <textarea
+              readOnly
+              value={registrations.map(r => r.email).join(', ')}
+              rows={6}
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-blue-500"
+              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            />
+
+            <div className="mt-6">
+              <h4 className="text-white font-medium mb-3">Individual Emails:</h4>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {registrations.map((reg) => (
+                  <div
+                    key={reg.id}
+                    className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg"
+                  >
+                    <div>
+                      <span className="text-white">{reg.fullName}</span>
+                      <span className="text-slate-500 mx-2">—</span>
+                      <span className="text-blue-400">{reg.email}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Accommodations Tab */}
+        {activeTab === 'accommodations' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <BedDouble className="h-5 w-5 text-blue-400" />
+                Accommodation Selections ({userAccommodations.length} responses)
+              </h3>
+            </div>
+
+            {loadingAccommodations ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+              </div>
+            ) : userAccommodations.length === 0 ? (
+              <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center">
+                <BedDouble className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+                <p className="text-slate-400">No accommodation selections recorded yet</p>
+              </div>
+            ) : (
+              /* Night Cards */
+              <div className="space-y-3">
+                {TRIP_NIGHTS.map((nightInfo) => {
+                  const nightKey = nightInfo.key;
+                  const config = nightConfigs[nightKey];
+                  const counts = getAccommodationCounts(nightKey);
+                  const isExpanded = expandedNights.has(nightKey);
+                  const sortedUsers = getSortedUsersForNight(nightKey);
+
+                  return (
+                    <div
+                      key={nightKey}
+                      className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden"
+                    >
+                      {/* Header - Clickable */}
+                      <button
+                        onClick={() => toggleNight(nightKey)}
+                        className="w-full p-4 flex items-center justify-between hover:bg-slate-700/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="text-left">
+                            <h4 className="text-white font-semibold">
+                              {nightInfo.label}
+                            </h4>
+                            <p className="text-sm text-slate-400">
+                              {config?.hotelName || nightInfo.location || 'TBD'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Counts Summary */}
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-600/20 rounded">
+                              <Hotel className="h-4 w-4 text-blue-400" />
+                              <span className="text-blue-300">{counts.hotel}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-600/20 rounded">
+                              <Tent className="h-4 w-4 text-green-400" />
+                              <span className="text-green-300">{counts.camping}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-600/20 rounded">
+                              <UserX className="h-4 w-4 text-slate-400" />
+                              <span className="text-slate-300">{counts.own}</span>
+                            </div>
+                            {counts.none > 0 && (
+                              <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-600/20 rounded">
+                                <AlertCircle className="h-4 w-4 text-amber-400" />
+                                <span className="text-amber-300">{counts.none}</span>
+                              </div>
+                            )}
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="h-5 w-5 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-slate-400" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Expanded Content */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-700">
+                          {/* Legend */}
+                          <div className="px-4 py-2 bg-slate-900/50 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Hotel className="h-3 w-3 text-blue-400" /> Hotel
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Tent className="h-3 w-3 text-green-400" /> Camping
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <UserX className="h-3 w-3 text-slate-400" /> On Your Own
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <BedDouble className="h-3 w-3 text-purple-400" /> Single Room
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <UtensilsCrossed className="h-3 w-3 text-amber-400" /> Dinner
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Coffee className="h-3 w-3 text-amber-400" /> Breakfast
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Compass className="h-3 w-3 text-cyan-400" /> Activity
+                            </span>
+                          </div>
+
+                          {/* User List */}
+                          <div className="divide-y divide-slate-700">
+                            {sortedUsers.map((userData) => {
+                              const selection = userData.selections[nightKey];
+                              const accommodation = selection?.accommodation;
+
+                              const accomIcon = accommodation === 'hotel' ? (
+                                <Hotel className="h-4 w-4 text-blue-400" />
+                              ) : accommodation === 'camping' ? (
+                                <Tent className="h-4 w-4 text-green-400" />
+                              ) : accommodation === 'own' ? (
+                                <UserX className="h-4 w-4 text-slate-400" />
+                              ) : (
+                                <AlertCircle className="h-4 w-4 text-amber-400" />
+                              );
+
+                              const accomLabel = accommodation === 'hotel' ? 'Hotel' :
+                                accommodation === 'camping' ? 'Camping' :
+                                accommodation === 'own' ? 'On Your Own' : 'Not Selected';
+
+                              return (
+                                <div
+                                  key={userData.odUserId}
+                                  className="p-4 hover:bg-slate-700/30 transition-colors"
+                                >
+                                  <div className="flex items-start gap-4">
+                                    {/* Avatar */}
+                                    <div className="w-10 h-10 rounded-full bg-slate-600 overflow-hidden flex-shrink-0">
+                                      {userData.odHeadshotUrl ? (
+                                        <img
+                                          src={userData.odHeadshotUrl}
+                                          alt={userData.odName}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                          {userData.odName?.charAt(0) || '?'}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-white font-medium">{userData.odName}</span>
+                                        <span className="flex items-center gap-1 px-2 py-0.5 bg-slate-700 rounded text-xs">
+                                          {accomIcon}
+                                          <span className="text-slate-300">{accomLabel}</span>
+                                        </span>
+                                      </div>
+
+                                      {/* Selection Details */}
+                                      <div className="flex flex-wrap gap-2 text-xs">
+                                        {/* Single Room */}
+                                        {selection?.prefersSingleRoom && (
+                                          <span className="flex items-center gap-1 px-2 py-1 bg-purple-600/20 rounded text-purple-300">
+                                            <BedDouble className="h-3 w-3" />
+                                            Single Room
+                                          </span>
+                                        )}
+
+                                        {/* Floor Sleeping */}
+                                        {selection?.prefersFloorSleeping && (
+                                          <span className="flex items-center gap-1 px-2 py-1 bg-slate-600/30 rounded text-slate-300">
+                                            Floor Sleeping OK
+                                          </span>
+                                        )}
+
+                                        {/* Dinner */}
+                                        {selection?.dinner && (
+                                          <span className="flex items-center gap-1 px-2 py-1 bg-amber-600/20 rounded text-amber-300">
+                                            <UtensilsCrossed className="h-3 w-3" />
+                                            Dinner
+                                          </span>
+                                        )}
+
+                                        {/* Breakfast */}
+                                        {selection?.breakfast && (
+                                          <span className="flex items-center gap-1 px-2 py-1 bg-amber-600/20 rounded text-amber-300">
+                                            <Coffee className="h-3 w-3" />
+                                            Breakfast
+                                          </span>
+                                        )}
+
+                                        {/* Activities */}
+                                        {selection?.optionalActivitiesInterested && selection.optionalActivitiesInterested.length > 0 && (
+                                          selection.optionalActivitiesInterested.map((actId: string) => {
+                                            const activity = config?.optionalActivities?.find((a: OptionalActivity) => a.id === actId);
+                                            return (
+                                              <span
+                                                key={actId}
+                                                className="flex items-center gap-1 px-2 py-1 bg-cyan-600/20 rounded text-cyan-300"
+                                              >
+                                                <Compass className="h-3 w-3" />
+                                                {activity?.title || actId}
+                                              </span>
+                                            );
+                                          })
+                                        )}
+                                      </div>
+
+                                      {/* Roommate & Dietary */}
+                                      {(userData.preferredRoommate || userData.dietaryRestrictions) && (
+                                        <div className="mt-2 pt-2 border-t border-slate-700/50 text-xs text-slate-400 space-y-1">
+                                          {userData.preferredRoommate && (
+                                            <div className="flex items-center gap-1">
+                                              <UserRound className="h-3 w-3" />
+                                              <span>Prefers: {getRoommateName(userData.preferredRoommate) || userData.preferredRoommate}</span>
+                                            </div>
+                                          )}
+                                          {userData.dietaryRestrictions && (
+                                            <div className="flex items-start gap-1">
+                                              <UtensilsCrossed className="h-3 w-3 mt-0.5" />
+                                              <span>Diet: {userData.dietaryRestrictions}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Ledger Tab */}
+        {activeTab === 'ledger' && (
+          <div className="space-y-6">
+            {/* All Riders Summary */}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl border border-slate-600 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-blue-400" />
+                All Riders Summary
+              </h3>
+              {!allRidersTotals.loaded ? (
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading totals...
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-900/50 rounded-lg p-4">
+                    <div className="text-slate-400 text-sm mb-1">Total Payments</div>
+                    <div className="text-2xl font-bold text-green-400">
+                      ${allRidersTotals.totalPayments.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/50 rounded-lg p-4">
+                    <div className="text-slate-400 text-sm mb-1">Estimated Charges</div>
+                    <div className="text-2xl font-bold text-white">
+                      ${allRidersTotals.totalEstimatedCharges.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/50 rounded-lg p-4">
+                    <div className="text-slate-400 text-sm mb-1">Posted Charges</div>
+                    <div className="text-2xl font-bold text-amber-400">
+                      ${allRidersTotals.totalPostedCharges.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/50 rounded-lg p-4">
+                    <div className="text-slate-400 text-sm mb-1">
+                      {allRidersTotals.totalPayments >= allRidersTotals.totalEstimatedCharges ? 'Balance (Credit)' : 'Balance Due'}
+                    </div>
+                    <div className={`text-2xl font-bold ${
+                      allRidersTotals.totalPayments >= allRidersTotals.totalEstimatedCharges
+                        ? 'text-green-400'
+                        : 'text-red-400'
+                    }`}>
+                      ${Math.abs(allRidersTotals.totalEstimatedCharges - allRidersTotals.totalPayments).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rider Selector */}
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-blue-400" />
+                Rider Ledger
+              </h3>
+              <div className="flex flex-wrap gap-4">
+                <select
+                  value={selectedLedgerUserId || ''}
+                  onChange={(e) => setSelectedLedgerUserId(e.target.value || null)}
+                  className="flex-1 min-w-[250px] px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Select a rider...</option>
+                  {registrations.map((reg) => (
+                    <option key={reg.uid} value={reg.uid}>
+                      {reg.fullName}
+                    </option>
+                  ))}
+                </select>
+                {selectedLedgerUserId && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowChargeModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Post Charge
+                    </button>
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Record Payment
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Statement Content */}
+            {selectedLedgerUserId && (
+              <>
+                {loadingLedger ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Estimated Charges Section */}
+                    {(() => {
+                      const estimates = calculateEstimatedCharges(selectedLedgerUserId);
+                      const totalEstimate = estimates.reduce((sum, e) => sum + e.amount, 0);
+                      const isExpanded = expandedLedgerSections.has('estimates');
+
+                      return (
+                        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                          <button
+                            onClick={() => setExpandedLedgerSections(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has('estimates')) newSet.delete('estimates');
+                              else newSet.add('estimates');
+                              return newSet;
+                            })}
+                            className="w-full p-4 flex items-center justify-between hover:bg-slate-700/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-slate-400" />
+                              <span className="text-white font-semibold">Estimated Charges</span>
+                              <span className="text-slate-400 text-sm">({estimates.length} items)</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-white font-semibold">${totalEstimate.toFixed(2)}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-slate-400" />
+                              )}
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="px-4 pb-4 border-t border-slate-700">
+                              {estimates.length === 0 ? (
+                                <p className="text-slate-400 text-sm pt-4">
+                                  No selections recorded. Rider needs to complete their accommodation preferences.
+                                </p>
+                              ) : (
+                                <div className="space-y-2 pt-4">
+                                  {estimates.map((est, idx) => (
+                                    <div key={idx} className="flex justify-between text-sm py-1 border-b border-slate-700/50">
+                                      <span className="text-slate-300">{est.description}</span>
+                                      <span className="text-slate-300">${est.amount.toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Posted Charges Section */}
+                    {(() => {
+                      const totalCharges = ledgerCharges.reduce((sum, c) => sum + c.amount, 0);
+                      const isExpanded = expandedLedgerSections.has('charges');
+
+                      return (
+                        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                          <button
+                            onClick={() => setExpandedLedgerSections(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has('charges')) newSet.delete('charges');
+                              else newSet.add('charges');
+                              return newSet;
+                            })}
+                            className="w-full p-4 flex items-center justify-between hover:bg-slate-700/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-5 w-5 text-amber-400" />
+                              <span className="text-white font-semibold">Posted Charges</span>
+                              <span className="text-slate-400 text-sm">({ledgerCharges.length} items)</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-amber-400 font-semibold">${totalCharges.toFixed(2)}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-slate-400" />
+                              )}
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="px-4 pb-4 border-t border-slate-700">
+                              {ledgerCharges.length === 0 ? (
+                                <p className="text-slate-400 text-sm pt-4">No charges posted yet.</p>
+                              ) : (
+                                <div className="space-y-2 pt-4">
+                                  {ledgerCharges.map((charge) => (
+                                    <div key={charge.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-700/50">
+                                      <div className="flex-1">
+                                        <span className="text-slate-300">{charge.description}</span>
+                                        <span className="text-slate-500 text-xs ml-2">
+                                          ({charge.date.toLocaleDateString()})
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <span className={charge.amount >= 0 ? 'text-amber-400' : 'text-green-400'}>
+                                          {charge.amount >= 0 ? '' : '-'}${Math.abs(charge.amount).toFixed(2)}
+                                        </span>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleDeleteCharge(charge.id); }}
+                                          className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Payments Section */}
+                    {(() => {
+                      const totalPayments = ledgerPayments.reduce((sum, p) => sum + p.amount, 0);
+                      const isExpanded = expandedLedgerSections.has('payments');
+
+                      return (
+                        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                          <button
+                            onClick={() => setExpandedLedgerSections(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has('payments')) newSet.delete('payments');
+                              else newSet.add('payments');
+                              return newSet;
+                            })}
+                            className="w-full p-4 flex items-center justify-between hover:bg-slate-700/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Banknote className="h-5 w-5 text-green-400" />
+                              <span className="text-white font-semibold">Payments Received</span>
+                              <span className="text-slate-400 text-sm">({ledgerPayments.length} items)</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-green-400 font-semibold">${totalPayments.toFixed(2)}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-slate-400" />
+                              )}
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="px-4 pb-4 border-t border-slate-700">
+                              {ledgerPayments.length === 0 ? (
+                                <p className="text-slate-400 text-sm pt-4">No payments recorded yet.</p>
+                              ) : (
+                                <div className="space-y-2 pt-4">
+                                  {ledgerPayments.map((payment) => (
+                                    <div key={payment.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-700/50">
+                                      <div className="flex-1 flex items-center gap-2">
+                                        {payment.method === 'venmo' && <CreditCard className="h-4 w-4 text-blue-400" />}
+                                        {payment.method === 'zelle' && <CreditCard className="h-4 w-4 text-purple-400" />}
+                                        {payment.method === 'cash' && <Banknote className="h-4 w-4 text-green-400" />}
+                                        <span className="text-slate-300">
+                                          {payment.note || payment.method.charAt(0).toUpperCase() + payment.method.slice(1)}
+                                        </span>
+                                        <span className="text-slate-500 text-xs">
+                                          ({payment.date.toLocaleDateString()})
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-green-400">${payment.amount.toFixed(2)}</span>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleDeletePayment(payment.id); }}
+                                          className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Balance Summary */}
+                    <div className="bg-slate-900 rounded-xl border border-slate-600 p-6">
+                      <h4 className="text-white font-semibold mb-4">Balance Summary</h4>
+                      {(() => {
+                        const totalCharges = ledgerCharges.reduce((sum, c) => sum + c.amount, 0);
+                        const totalPayments = ledgerPayments.reduce((sum, p) => sum + p.amount, 0);
+                        const estimates = calculateEstimatedCharges(selectedLedgerUserId);
+                        const totalEstimate = estimates.reduce((sum, e) => sum + e.amount, 0);
+                        const estimatedBalance = totalEstimate - totalPayments;
+
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-400">Estimated Charges:</span>
+                              <span className="text-white">${totalEstimate.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-400">Posted Charges:</span>
+                              <span className="text-white">${totalCharges.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-400">Payments:</span>
+                              <span className="text-green-400">${totalPayments.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between pt-2 border-t border-slate-700 font-semibold">
+                              <span className="text-white">Estimated Balance:</span>
+                              <span className={estimatedBalance > 0 ? 'text-amber-400' : estimatedBalance < 0 ? 'text-green-400' : 'text-white'}>
+                                {estimatedBalance > 0 ? `$${estimatedBalance.toFixed(2)} owed` : estimatedBalance < 0 ? `$${Math.abs(estimatedBalance).toFixed(2)} credit` : '$0.00'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {!selectedLedgerUserId && (
+              <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center">
+                <Receipt className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+                <p className="text-slate-400">Select a rider to view their ledger</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Roster Tab */}
+        {activeTab === 'roster' && (
+          <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <FileText className="h-5 w-5 text-blue-400" />
+                Rider Roster ({registrations.length})
+              </h3>
+              <button
+                onClick={() => {
+                  // Copy roster to clipboard as TSV for pasting into spreadsheets
+                  const headers = ['Name', 'Phone', 'Email', ...TRIP_NIGHTS.map((_, i) => `N${i + 1}`), 'Roommate'];
+                  const rows = registrations.map(reg => {
+                    const userData = userAccommodations.find(u => u.odUserId === reg.uid);
+                    const nightCells = TRIP_NIGHTS.map(night => {
+                      const sel = userData?.selections?.[night.key];
+                      if (!sel?.accommodation) return '-';
+                      return sel.accommodation === 'hotel' ? 'H' : sel.accommodation === 'camping' ? 'C' : 'O';
+                    });
+                    const roommateReg = userData?.preferredRoommate
+                      ? registrations.find(r => r.uid === userData.preferredRoommate)
+                      : null;
+                    const roommateName = roommateReg?.fullName || '-';
+                    return [
+                      reg.fullName,
+                      reg.phone,
+                      reg.email,
+                      ...nightCells,
+                      roommateName
+                    ].join('\t');
+                  });
+                  navigator.clipboard.writeText([headers.join('\t'), ...rows].join('\n'));
+                  alert('Roster copied to clipboard!');
+                }}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors"
+              >
+                Copy to Clipboard
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-900/50 text-left">
+                    <th className="px-3 py-2 text-slate-400 font-medium sticky left-0 bg-slate-900/50">Name</th>
+                    <th className="px-3 py-2 text-slate-400 font-medium whitespace-nowrap">Phone</th>
+                    <th className="px-3 py-2 text-slate-400 font-medium">Email</th>
+                    {TRIP_NIGHTS.map((night, idx) => (
+                      <th key={night.key} className="px-2 py-2 text-slate-400 font-medium text-center" title={night.label}>
+                        N{idx + 1}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 text-slate-400 font-medium">Roommate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700">
+                  {registrations.map(reg => {
+                    const userData = userAccommodations.find(u => u.odUserId === reg.uid);
+                    return (
+                      <tr key={reg.id} className="hover:bg-slate-700/30">
+                        <td className="px-3 py-2 text-white font-medium whitespace-nowrap sticky left-0 bg-slate-800">
+                          {reg.nickname || reg.fullName.split(' ')[0]}
+                        </td>
+                        <td className="px-3 py-2 text-slate-300 whitespace-nowrap">
+                          <a href={`tel:${reg.phone}`} className="hover:text-blue-400">{reg.phone}</a>
+                        </td>
+                        <td className="px-3 py-2 text-slate-300">
+                          <a href={`mailto:${reg.email}`} className="hover:text-blue-400 truncate block max-w-[180px]">{reg.email}</a>
+                        </td>
+                        {TRIP_NIGHTS.map(night => {
+                          const sel = userData?.selections?.[night.key];
+                          const accom = sel?.accommodation;
+                          let display = '-';
+                          let colorClass = 'text-slate-500';
+                          if (accom === 'hotel') {
+                            display = 'H';
+                            colorClass = 'text-blue-400';
+                          } else if (accom === 'camping') {
+                            display = 'C';
+                            colorClass = 'text-green-400';
+                          } else if (accom === 'own') {
+                            display = 'O';
+                            colorClass = 'text-amber-400';
+                          }
+                          return (
+                            <td key={night.key} className={`px-2 py-2 text-center font-medium ${colorClass}`}>
+                              {display}
+                            </td>
+                          );
+                        })}
+                        <td className="px-3 py-2 text-slate-300 whitespace-nowrap">
+                          {(() => {
+                            if (!userData?.preferredRoommate) return '-';
+                            const roommateReg = registrations.find(r => r.uid === userData.preferredRoommate);
+                            return roommateReg?.fullName || '-';
+                          })()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-4 py-3 bg-slate-900/30 border-t border-slate-700 text-xs text-slate-500">
+              <span className="mr-4"><span className="text-blue-400 font-medium">H</span> = Hotel</span>
+              <span className="mr-4"><span className="text-green-400 font-medium">C</span> = Camping</span>
+              <span className="mr-4"><span className="text-amber-400 font-medium">O</span> = Own</span>
+              <span><span className="text-slate-500 font-medium">-</span> = Not selected</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Record Deposit Modal */}
+      {showDepositModal && depositModalPerson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-green-400" />
+                Record Deposit
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDepositModal(false);
+                  setDepositModalPerson(null);
+                }}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Person info */}
+              <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-slate-600 overflow-hidden flex-shrink-0">
+                  {depositModalPerson.headshotUrl ? (
+                    <img
+                      src={depositModalPerson.headshotUrl}
+                      alt={depositModalPerson.fullName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      {depositModalPerson.fullName?.charAt(0) || '?'}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-white font-medium">{depositModalPerson.fullName}</div>
+                  <div className="text-sm text-slate-400">
+                    Required: ${getRequiredDeposit(depositModalPerson)}
+                    {depositModalPerson.hasPillion && ' (includes pillion)'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount input */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Amount Collected
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <input
+                    type="number"
+                    value={depositModalAmount}
+                    onChange={(e) => setDepositModalAmount(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowDepositModal(false);
+                    setDepositModalPerson(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRecordDeposit}
+                  disabled={recordingDeposit}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
+                  {recordingDeposit ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {recordingDeposit ? 'Saving...' : 'Record Deposit'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post Charge Modal */}
+      {showChargeModal && selectedLedgerUserId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-amber-400" />
+                Post Charge
+              </h3>
+              <button
+                onClick={() => setShowChargeModal(false)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Charge Type */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Type</label>
+                <select
+                  value={newChargeType}
+                  onChange={(e) => setNewChargeType(e.target.value as typeof newChargeType)}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="accommodation">Accommodation</option>
+                  <option value="meal">Meal</option>
+                  <option value="fee">Fee</option>
+                  <option value="adjustment">Adjustment/Credit</option>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                <input
+                  type="text"
+                  value={newChargeDescription}
+                  onChange={(e) => setNewChargeDescription(e.target.value)}
+                  placeholder="e.g., Night 1 - Hotel San Ignacio"
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Amount {newChargeType === 'adjustment' && '(use negative for credits)'}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newChargeAmount}
+                    onChange={(e) => setNewChargeAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Night Key (optional) */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Night (optional)</label>
+                <select
+                  value={newChargeNightKey}
+                  onChange={(e) => setNewChargeNightKey(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Not specific to a night</option>
+                  {TRIP_NIGHTS.map((night) => (
+                    <option key={night.key} value={night.key}>{night.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowChargeModal(false)}
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCharge}
+                  disabled={savingCharge || !newChargeDescription.trim() || !newChargeAmount}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
+                  {savingCharge ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {savingCharge ? 'Saving...' : 'Post Charge'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Payment Modal */}
+      {showPaymentModal && selectedLedgerUserId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Banknote className="h-5 w-5 text-green-400" />
+                Record Payment
+              </h3>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Amount */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newPaymentAmount}
+                    onChange={(e) => setNewPaymentAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewPaymentMethod('venmo')}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                      newPaymentMethod === 'venmo'
+                        ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+                        : 'bg-slate-900 border-slate-600 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Venmo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewPaymentMethod('zelle')}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                      newPaymentMethod === 'zelle'
+                        ? 'bg-purple-600/20 border-purple-500 text-purple-300'
+                        : 'bg-slate-900 border-slate-600 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Zelle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewPaymentMethod('cash')}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                      newPaymentMethod === 'cash'
+                        ? 'bg-green-600/20 border-green-500 text-green-300'
+                        : 'bg-slate-900 border-slate-600 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    <Banknote className="h-4 w-4" />
+                    Cash
+                  </button>
+                </div>
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Note (optional)</label>
+                <input
+                  type="text"
+                  value={newPaymentNote}
+                  onChange={(e) => setNewPaymentNote(e.target.value)}
+                  placeholder="e.g., Initial deposit"
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSavePayment}
+                  disabled={savingPayment || !newPaymentAmount}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
+                  {savingPayment ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {savingPayment ? 'Saving...' : 'Record Payment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
