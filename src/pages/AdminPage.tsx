@@ -114,7 +114,10 @@ export default function AdminPage() {
   const [savingDeposit, setSavingDeposit] = useState(false);
 
   // Email state
-  const [activeTab, setActiveTab] = useState<'registrations' | 'email' | 'announcements' | 'emailList' | 'accommodations' | 'ledger' | 'roster'>('registrations');
+  const [activeTab, setActiveTab] = useState<'registrations' | 'email' | 'announcements' | 'emailList' | 'accommodations' | 'ledger' | 'roster' | 'profileViewer'>('registrations');
+
+  // Profile viewer state
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [emailRecipients, setEmailRecipients] = useState<'all' | 'selected'>('all');
@@ -1050,6 +1053,17 @@ export default function AdminPage() {
           >
             <FileText className="h-4 w-4 inline mr-2" />
             Roster
+          </button>
+          <button
+            onClick={() => setActiveTab('profileViewer')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'profileViewer'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Eye className="h-4 w-4 inline mr-2" />
+            View Profile
           </button>
 
           {/* Separator */}
@@ -2631,6 +2645,375 @@ export default function AdminPage() {
               <span className="mr-4"><span className="text-amber-400 font-medium">O</span> = Own</span>
               <span><span className="text-slate-500 font-medium">-</span> = Not selected</span>
             </div>
+          </div>
+        )}
+
+        {/* Profile Viewer Tab */}
+        {activeTab === 'profileViewer' && (
+          <div className="space-y-6">
+            {/* Rider Selection */}
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Eye className="h-5 w-5 text-blue-400" />
+                Select Rider to View Profile
+              </h3>
+              <select
+                value={selectedProfileUserId || ''}
+                onChange={(e) => setSelectedProfileUserId(e.target.value || null)}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="">-- Select a rider --</option>
+                {registrations
+                  .slice()
+                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                  .map(reg => (
+                    <option key={reg.id} value={reg.uid}>
+                      {reg.fullName} {reg.nickname ? `"${reg.nickname}"` : ''}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {/* Profile Display */}
+            {selectedProfileUserId && (() => {
+              const profileReg = registrations.find(r => r.uid === selectedProfileUserId);
+              if (!profileReg) return null;
+
+              const userData = userAccommodations.find(u => u.odUserId === selectedProfileUserId);
+
+              // Build skills list
+              const skills: string[] = [];
+              if (profileReg.skillMechanical) skills.push('Mechanical');
+              if (profileReg.skillMedical) skills.push('Medical');
+              if (profileReg.skillPhotography) skills.push('Photography');
+              if (profileReg.skillOther && profileReg.skillOtherText) skills.push(profileReg.skillOtherText);
+
+              // Format helper functions
+              const formatYearsRiding = (value: string): string => {
+                const map: Record<string, string> = {
+                  less1: 'Less than 1 year', '1to5': '1-5 years', '5to10': '5-10 years', '10plus': '10+ years'
+                };
+                return map[value] || value;
+              };
+              const formatOffRoad = (value: string): string => {
+                const map: Record<string, string> = {
+                  none: 'No off-road experience', beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced'
+                };
+                return map[value] || value;
+              };
+              const formatBaja = (value: string): string => {
+                const map: Record<string, string> = {
+                  no: 'First time', once: 'Once before', twice: 'Twice before', many: 'Many times'
+                };
+                return map[value] || value;
+              };
+              const formatRepair = (value: string): string => {
+                const map: Record<string, string> = {
+                  none: 'None', basic: 'Basic', comfortable: 'Comfortable', macgyver: 'MacGyver level'
+                };
+                return map[value] || value;
+              };
+              const formatAccom = (value: string): string => {
+                const map: Record<string, string> = {
+                  camping: 'Prefer camping', hotels: 'Prefer hotels', either: 'Either is fine'
+                };
+                return map[value] || value;
+              };
+
+              return (
+                <div className="space-y-6">
+                  {/* Personal Information */}
+                  <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center">
+                        <UserRound className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-white">Personal Information</h2>
+                    </div>
+                    <div className="flex items-start gap-6">
+                      {/* Photo */}
+                      <div className="w-24 h-24 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden border-2 border-slate-600 flex-shrink-0">
+                        {profileReg.headshotUrl ? (
+                          <img src={profileReg.headshotUrl} alt={profileReg.fullName} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-3xl text-slate-400">{profileReg.fullName?.charAt(0) || '?'}</span>
+                        )}
+                      </div>
+                      {/* Details */}
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <h3 className="text-xl font-semibold text-white">
+                            {profileReg.fullName}
+                            {profileReg.nickname && <span className="text-slate-400 font-normal ml-2">"{profileReg.nickname}"</span>}
+                          </h3>
+                          {profileReg.tagline && <p className="text-slate-400 italic">{profileReg.tagline}</p>}
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm">
+                          <div className="flex items-center gap-2 text-slate-300">
+                            <MapPin className="h-4 w-4 text-slate-500" />
+                            {profileReg.city}, {profileReg.state} {profileReg.zipCode}
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-300">
+                            <Phone className="h-4 w-4 text-slate-500" />
+                            <a href={`tel:${profileReg.phone}`} className="hover:text-blue-400">{profileReg.phone}</a>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-300">
+                            <Mail className="h-4 w-4 text-slate-500" />
+                            <a href={`mailto:${profileReg.email}`} className="hover:text-blue-400">{profileReg.email}</a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Emergency Contact */}
+                  <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-red-600/20 rounded-lg flex items-center justify-center">
+                        <AlertTriangle className="h-5 w-5 text-red-400" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-white">Emergency Contact</h2>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-slate-500 text-sm">Contact</p>
+                        <p className="text-white">{profileReg.emergencyName}</p>
+                        <p className="text-slate-400 text-sm">{profileReg.emergencyRelation}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Phone</p>
+                        <p className="text-white">
+                          <a href={`tel:${profileReg.emergencyPhone}`} className="hover:text-blue-400">{profileReg.emergencyPhone}</a>
+                        </p>
+                      </div>
+                      {profileReg.medicalConditions && (
+                        <div className="md:col-span-2">
+                          <p className="text-slate-500 text-sm">Medical Conditions / Allergies</p>
+                          <p className="text-white">{profileReg.medicalConditions}</p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* Motorcycle & Experience */}
+                  <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center">
+                        <Bike className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-white">Motorcycle & Experience</h2>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-slate-500 text-sm">Motorcycle</p>
+                        <p className="text-white">{profileReg.bikeYear} {profileReg.bikeModel}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Years Riding</p>
+                        <p className="text-white">{formatYearsRiding(profileReg.yearsRiding)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Off-Road Experience</p>
+                        <p className="text-white">{formatOffRoad(profileReg.offRoadExperience)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Repair Experience</p>
+                        <p className="text-white">{formatRepair(profileReg.repairExperience)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Baja Experience</p>
+                        <p className="text-white">{formatBaja(profileReg.bajaTourExperience)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Spanish Level</p>
+                        <p className="text-white">{formatExperience(profileReg.spanishLevel)}</p>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Skills & Equipment */}
+                  <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center">
+                        <Settings className="h-5 w-5 text-green-400" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-white">Skills & Equipment</h2>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-slate-500 text-sm">T-Shirt Size</p>
+                        <p className="text-white">{profileReg.tshirtSize || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Equipment</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {profileReg.passportValid && (
+                            <span className="px-2 py-1 bg-green-600/20 text-green-400 rounded text-xs">Valid Passport</span>
+                          )}
+                          {profileReg.hasGarminInreach && (
+                            <span className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded text-xs">Garmin InReach</span>
+                          )}
+                          {profileReg.hasToolkit && (
+                            <span className="px-2 py-1 bg-purple-600/20 text-purple-400 rounded text-xs">Toolkit</span>
+                          )}
+                          {!profileReg.passportValid && !profileReg.hasGarminInreach && !profileReg.hasToolkit && (
+                            <span className="text-slate-500 text-sm">None specified</span>
+                          )}
+                        </div>
+                      </div>
+                      {skills.length > 0 && (
+                        <div className="md:col-span-2">
+                          <p className="text-slate-500 text-sm">Special Skills</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {skills.map((skill, idx) => (
+                              <span key={idx} className="px-2 py-1 bg-amber-600/20 text-amber-400 rounded text-xs">
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* Pillion (if applicable) */}
+                  {profileReg.hasPillion && (
+                    <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-pink-600/20 rounded-lg flex items-center justify-center">
+                          <Users className="h-5 w-5 text-pink-400" />
+                        </div>
+                        <h2 className="text-xl font-semibold text-white">Pillion (Passenger)</h2>
+                      </div>
+                      <div className="text-slate-300">
+                        <p className="text-white font-medium">Has Pillion: Yes</p>
+                        <p className="text-slate-400 text-sm mt-1">Pillion details are included in their registration</p>
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Accommodation Preferences */}
+                  <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                        <Hotel className="h-5 w-5 text-purple-400" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-white">Accommodation Preferences</h2>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-slate-500 text-sm">Preference</p>
+                        <p className="text-white">{formatAccom(profileReg.accommodationPreference)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Group Plan</p>
+                        <p className="text-white">{profileReg.participateGroup ? 'Yes' : 'No'}</p>
+                      </div>
+                      {userData?.preferredRoommate && (
+                        <div>
+                          <p className="text-slate-500 text-sm">Preferred Roommate</p>
+                          <p className="text-white">
+                            {registrations.find(r => r.id === userData.preferredRoommate || r.uid === userData.preferredRoommate)?.fullName || 'Unknown'}
+                          </p>
+                        </div>
+                      )}
+                      {userData?.dietaryRestrictions && (
+                        <div>
+                          <p className="text-slate-500 text-sm">Dietary Restrictions</p>
+                          <p className="text-white">{userData.dietaryRestrictions}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nightly Selections */}
+                    {userData?.selections && Object.keys(userData.selections).length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-slate-700">
+                        <p className="text-slate-500 text-sm mb-3">Nightly Selections</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {TRIP_NIGHTS.map((night, idx) => {
+                            const sel = userData.selections[night.key];
+                            const accom = sel?.accommodation;
+                            let bgColor = 'bg-slate-700';
+                            let textColor = 'text-slate-400';
+                            let label = 'Not set';
+                            if (accom === 'hotel') {
+                              bgColor = 'bg-blue-600/20';
+                              textColor = 'text-blue-400';
+                              label = 'Hotel';
+                            } else if (accom === 'camping') {
+                              bgColor = 'bg-green-600/20';
+                              textColor = 'text-green-400';
+                              label = 'Camping';
+                            } else if (accom === 'own') {
+                              bgColor = 'bg-amber-600/20';
+                              textColor = 'text-amber-400';
+                              label = 'Own';
+                            }
+                            return (
+                              <div key={night.key} className={`${bgColor} rounded-lg p-3 text-center`}>
+                                <p className="text-xs text-slate-500 mb-1">Night {idx + 1}</p>
+                                <p className={`font-medium ${textColor}`}>{label}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Financial Summary */}
+                  <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-green-400" />
+                      </div>
+                      <h2 className="text-xl font-semibold text-white">Financial Summary</h2>
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-slate-500 text-sm">Deposit Required</p>
+                        <p className="text-white text-lg font-semibold">${profileReg.depositRequired || getRequiredDeposit(profileReg)}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Amount Collected</p>
+                        <p className="text-green-400 text-lg font-semibold">${profileReg.amtCollected || profileReg.depositPaid || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Balance</p>
+                        <p className={`text-lg font-semibold ${
+                          (profileReg.amtCollected || profileReg.depositPaid || 0) >= (profileReg.depositRequired || getRequiredDeposit(profileReg))
+                            ? 'text-green-400'
+                            : 'text-amber-400'
+                        }`}>
+                          ${Math.max(0, (profileReg.depositRequired || getRequiredDeposit(profileReg)) - (profileReg.amtCollected || profileReg.depositPaid || 0))} due
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Additional Notes */}
+                  {profileReg.anythingElse && (
+                    <section className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-cyan-600/20 rounded-lg flex items-center justify-center">
+                          <AlertCircle className="h-5 w-5 text-cyan-400" />
+                        </div>
+                        <h2 className="text-xl font-semibold text-white">Additional Notes</h2>
+                      </div>
+                      <p className="text-slate-300">{profileReg.anythingElse}</p>
+                    </section>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* No selection */}
+            {!selectedProfileUserId && (
+              <div className="bg-slate-800 rounded-xl border border-slate-700 p-12 text-center">
+                <Eye className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+                <p className="text-slate-400">Select a rider from the dropdown above to view their full profile</p>
+              </div>
+            )}
           </div>
         )}
       </div>
