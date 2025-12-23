@@ -357,10 +357,10 @@ export default function AdminPage() {
     });
   };
 
-  // Get roommate name by ID
+  // Get roommate name by ID (check both id and uid for compatibility)
   const getRoommateName = (odUserId: string | null) => {
     if (!odUserId) return null;
-    const reg = registrations.find(r => r.uid === odUserId);
+    const reg = registrations.find(r => r.id === odUserId || r.uid === odUserId);
     return reg?.fullName || null;
   };
 
@@ -2543,7 +2543,7 @@ export default function AdminPage() {
                       return sel.accommodation === 'hotel' ? 'H' : sel.accommodation === 'camping' ? 'C' : 'O';
                     });
                     const roommateReg = userData?.preferredRoommate
-                      ? registrations.find(r => r.uid === userData.preferredRoommate)
+                      ? registrations.find(r => r.id === userData.preferredRoommate || r.uid === userData.preferredRoommate)
                       : null;
                     const roommateName = roommateReg?.fullName || '-';
                     return [
@@ -2615,7 +2615,7 @@ export default function AdminPage() {
                         <td className="px-3 py-2 text-slate-300 whitespace-nowrap">
                           {(() => {
                             if (!userData?.preferredRoommate) return '-';
-                            const roommateReg = registrations.find(r => r.uid === userData.preferredRoommate);
+                            const roommateReg = registrations.find(r => r.id === userData.preferredRoommate || r.uid === userData.preferredRoommate);
                             return roommateReg?.fullName || '-';
                           })()}
                         </td>

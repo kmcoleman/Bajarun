@@ -3,15 +3,52 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Registrations - authenticated users can read all, write their own
+    // Registrations - authenticated users can read all
     match /registrations/{registrationId} {
+      // Admin UID
+      function isAdmin() {
+        return request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
-      allow update: if request.auth != null && request.auth.uid == resource.data.uid;
+
+      // Update rules:
+      // - Admin can update any registration (for recording deposits, etc.)
+      // - Users can update their own registration BUT cannot change amtCollected
+      allow update: if request.auth != null &&
+                       (isAdmin() ||
+                        (request.auth.uid == resource.data.uid &&
+                         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['amtCollected']))));
+
       allow delete: if false; // No deletes allowed
     }
 
-    // Discussion posts - authenticated users can read all, create, edit own
+    // Discussion posts - only registered users can read/write
+    // Registration check is done in the app; rules ensure user owns their posts
+    match /discussionPosts/{postId} {
+      // Helper function to check if user is registered
+      function isRegistered() {
+        return exists(/databases/$(database)/documents/registrations/$(request.auth.uid)) ||
+               get(/databases/$(database)/documents/registrations/$(request.auth.uid)).data.uid == request.auth.uid;
+      }
+
+      // Only authenticated users can read (frontend checks registration)
+      allow read: if request.auth != null;
+
+      // Create: must be authenticated and authorUid must match
+      allow create: if request.auth != null &&
+                       request.resource.data.authorUid == request.auth.uid;
+
+      // Update: must be authenticated (for likes/replies from any registered user)
+      allow update: if request.auth != null;
+
+      // Delete: only author can delete
+      allow delete: if request.auth != null &&
+                       resource.data.authorUid == request.auth.uid;
+    }
+
+    // Legacy discussion posts (old collection, keep for backwards compat)
     match /discussions/{postId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
@@ -30,6 +67,67 @@ service cloud.firestore {
     // Admin collection - only admins can read/write
     match /admins/{adminId} {
       allow read, write: if false; // Managed via console only
+    }
+
+    // Announcements - authenticated users can read, only admin can write
+    match /announcements/{announcementId} {
+      allow read: if request.auth != null;
+      // Only admin (Kevin) can create, update, or delete announcements
+      allow create, update, delete: if request.auth != null &&
+                                       request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
+    // Event Configuration - authenticated users can read, only admin can write
+    match /eventConfig/{configId} {
+      allow read: if request.auth != null;
+      // Only admin can create, update, or delete event config
+      allow create, update, delete: if request.auth != null &&
+                                       request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
+    // Email Templates - only admin can read/write
+    match /emailTemplates/{templateId} {
+      allow read, write: if request.auth != null &&
+                            request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
+    // Users collection - for accommodation selections and preferences
+    match /users/{userId} {
+      // Users can read and write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admin can read all user documents
+      allow read: if request.auth != null &&
+                     request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
+    // Ledger collection - for tracking charges and payments per user
+    match /ledger/{userId} {
+      // Users can read their own ledger (for viewing statements)
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Admin can read all ledgers
+      allow read: if request.auth != null &&
+                     request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+      // Only admin can write to ledgers
+      allow write: if request.auth != null &&
+                      request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+
+      // Charges subcollection
+      match /charges/{chargeId} {
+        allow read: if request.auth != null &&
+                       (request.auth.uid == userId ||
+                        request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2');
+        allow write: if request.auth != null &&
+                        request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+      }
+
+      // Payments subcollection
+      match /payments/{paymentId} {
+        allow read: if request.auth != null &&
+                       (request.auth.uid == userId ||
+                        request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2');
+        allow write: if request.auth != null &&
+                        request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+      }
     }
   }
 }

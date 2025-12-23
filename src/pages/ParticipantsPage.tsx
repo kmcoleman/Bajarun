@@ -6,25 +6,72 @@
  * Requires authentication to view.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Bike, MapPin, LogIn, Loader2 } from 'lucide-react';
+import { User, Bike, MapPin, LogIn, Loader2, Phone, Mail, MessageCircle, Map as MapIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icons in Leaflet with bundlers
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// @ts-ignore
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
 
 interface Participant {
   id: string;
   fullName: string;
+  nickname: string | null;
+  tagline: string | null;
   city: string;
   state: string;
+  zipCode: string;
+  phone: string;
+  email: string;
   bikeModel: string;
   bikeYear: string;
   speaksSpanish: boolean;
   specialSkills: string;
+  skillMechanical: boolean;
+  skillMedical: boolean;
+  skillPhotography: boolean;
+  skillOther: boolean;
+  skillOtherText: string;
   headshotUrl: string | null;
   isOrganizer?: boolean;
   createdAt: Date;
+  // Stored coordinates (geocoded from zip code)
+  latitude?: number;
+  longitude?: number;
+}
+
+// Format phone number to (xxx) xxx-xxxx
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits[0] === '1') {
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return phone; // Return original if can't format
+}
+
+// Get digits only for tel: links
+function getPhoneDigits(phone: string): string {
+  return phone.replace(/\D/g, '');
 }
 
 export default function ParticipantsPage() {
@@ -32,6 +79,7 @@ export default function ParticipantsPage() {
   const navigate = useNavigate();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMap, setShowMap] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -60,6 +108,15 @@ export default function ParticipantsPage() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Filter participants that have stored coordinates
+  const participantsWithCoords = useMemo(() =>
+    participants.filter(p => p.latitude && p.longitude),
+    [participants]
+  );
+
+  // Fixed map center (Oakland/Berkeley area)
+  const mapCenter = { lat: 37.878942, lng: -122.180497 };
 
   // Still checking auth status
   if (authLoading) {
@@ -113,6 +170,78 @@ export default function ParticipantsPage() {
             <span className="text-blue-300">{participants.length} riders registered</span>
           </div>
         </div>
+
+        {/* Map Section */}
+        {!loading && participants.length > 0 && (
+          <div className="mb-12">
+            {/* Map Toggle */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <span className="w-8 h-8 bg-green-600/20 rounded-lg flex items-center justify-center">
+                  <MapIcon className="h-4 w-4 text-green-400" />
+                </span>
+                Rider Locations
+              </h2>
+              <button
+                onClick={() => setShowMap(!showMap)}
+                className="text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                {showMap ? 'Hide Map' : 'Show Map'}
+              </button>
+            </div>
+
+            {showMap && (
+              <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                {participantsWithCoords.length === 0 ? (
+                  <div className="h-80 flex items-center justify-center">
+                    <p className="text-slate-400">No locations available. Run geocoding from Admin Dashboard.</p>
+                  </div>
+                ) : (
+                  <MapContainer
+                    center={[mapCenter.lat, mapCenter.lng]}
+                    zoom={8}
+                    className="w-[500px] h-[500px] mx-auto"
+                    scrollWheelZoom={false}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {participantsWithCoords.map((participant) => (
+                      <Marker key={participant.id} position={[participant.latitude!, participant.longitude!]}>
+                        <Popup>
+                          <div className="text-center min-w-[150px]">
+                            {participant.headshotUrl && (
+                              <img
+                                src={participant.headshotUrl}
+                                alt={participant.fullName}
+                                className="w-12 h-12 rounded-full mx-auto mb-2 object-cover"
+                              />
+                            )}
+                            <p className="font-semibold text-slate-900">
+                              {participant.nickname || participant.fullName}
+                            </p>
+                            <p className="text-sm text-slate-600">
+                              {participant.city}, {participant.state}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {participant.bikeYear} {participant.bikeModel}
+                            </p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  </MapContainer>
+                )}
+                <div className="px-4 py-2 bg-slate-900/50 border-t border-slate-700">
+                  <p className="text-xs text-slate-500 text-center">
+                    {participantsWithCoords.length} of {participants.length} riders shown on map
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && (
@@ -211,7 +340,9 @@ function ParticipantCard({ person, featured }: ParticipantCardProps) {
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-lg font-semibold text-white">{person.fullName}</h3>
+              <h3 className="text-lg font-semibold text-white">
+                {person.nickname || person.fullName}
+              </h3>
               {person.isOrganizer && (
                 <span className="px-2 py-0.5 bg-blue-600/20 text-blue-400 text-xs rounded-full">
                   Organizer
@@ -223,12 +354,42 @@ function ParticipantCard({ person, featured }: ParticipantCardProps) {
                 </span>
               )}
             </div>
+            {/* Show full name if nickname is displayed */}
+            {person.nickname && (
+              <p className="text-slate-400 text-sm">{person.fullName}</p>
+            )}
           </div>
         </div>
 
-        {/* Special Skills */}
-        {person.specialSkills && (
-          <p className="text-slate-400 text-sm mt-4 italic">"{person.specialSkills}"</p>
+        {/* Tagline - always show for consistent height */}
+        <p className="text-slate-400 text-sm mt-4 italic min-h-[20px]">
+          {person.tagline ? `"${person.tagline}"` : '\u00A0'}
+        </p>
+
+        {/* Specialized Skills */}
+        {(person.skillMechanical || person.skillMedical || person.skillPhotography || person.skillOther) && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {person.skillMechanical && (
+              <span className="px-2 py-0.5 bg-orange-600/20 text-orange-400 text-xs rounded-full">
+                Mechanical
+              </span>
+            )}
+            {person.skillMedical && (
+              <span className="px-2 py-0.5 bg-red-600/20 text-red-400 text-xs rounded-full">
+                Medical
+              </span>
+            )}
+            {person.skillPhotography && (
+              <span className="px-2 py-0.5 bg-purple-600/20 text-purple-400 text-xs rounded-full">
+                Photography
+              </span>
+            )}
+            {person.skillOther && person.skillOtherText && (
+              <span className="px-2 py-0.5 bg-cyan-600/20 text-cyan-400 text-xs rounded-full">
+                {person.skillOtherText}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Details */}
@@ -241,6 +402,43 @@ function ParticipantCard({ person, featured }: ParticipantCardProps) {
             <MapPin className="h-4 w-4 text-slate-500" />
             <span className="text-slate-400">{person.city}, {person.state}</span>
           </div>
+
+          {/* Phone */}
+          {person.phone && (
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-green-500" />
+              <div className="flex items-center gap-3">
+                <a
+                  href={`tel:${getPhoneDigits(person.phone)}`}
+                  className="text-slate-300 hover:text-white transition-colors"
+                  title="Call"
+                >
+                  {formatPhoneNumber(person.phone)}
+                </a>
+                <a
+                  href={`sms:${getPhoneDigits(person.phone)}`}
+                  className="text-green-400 hover:text-green-300 transition-colors"
+                  title="Send text message"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Email */}
+          {person.email && (
+            <div className="flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4 text-blue-400" />
+              <a
+                href={`mailto:${person.email}`}
+                className="text-slate-300 hover:text-white transition-colors truncate"
+                title="Send email"
+              >
+                {person.email}
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>

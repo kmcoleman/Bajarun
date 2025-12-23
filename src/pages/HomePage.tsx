@@ -26,17 +26,20 @@ export default function HomePage() {
             <span className="text-blue-300 text-sm font-medium">BMW Motorcycle Club</span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-4">
             Baja California
             <span className="block text-blue-400">Adventure 2026</span>
           </h1>
+
+          <p className="text-xl text-slate-300 mb-6">March 19th – March 27th, 2026</p>
 
           <div className="bg-slate-800/80 rounded-xl border border-slate-700 p-6 lg:p-8 max-w-3xl mx-auto mb-8">
             <div className="text-slate-300 space-y-4 text-left">
               <p>
                 We're planning a group ride to Baja California in advance of the{' '}
                 <span className="text-white font-medium">BMW Motorcycle Club of Northern California's annual Death Valley Trip</span>{' '}
-                at the end of March.
+                at the end of March. We plan to start in <span className="text-white font-medium">El Cajon, CA on March 19th</span>,
+                depart for Baja on March 20th, and be in <span className="text-white font-medium">Furnace Creek on March 27th</span>.
               </p>
 
               <p>

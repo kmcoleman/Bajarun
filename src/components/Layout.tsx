@@ -9,7 +9,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   Home,
@@ -19,30 +19,46 @@ import {
   HelpCircle,
   Menu,
   X,
-  LogIn,
   LogOut,
   Bike,
-  ClipboardList,
   User,
   Mail,
   Phone,
   Camera,
   Edit2,
   Check,
-  Loader2
+  Loader2,
+  Bell,
+  Megaphone,
+  BedDouble,
+  FileText,
+  Clipboard,
+  Receipt,
+  Settings,
+  Calendar,
+  LifeBuoy
 } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-const navItems = [
+// Admin UID for conditional rendering
+const ADMIN_UID = 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+
+// Public nav items - always visible
+const publicNavItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/itinerary', label: 'Itinerary', icon: Map },
-  { path: '/discussion', label: 'Discussion', icon: MessageSquare },
-  { path: '/participants', label: 'Participants', icon: Users },
   { path: '/faq', label: 'FAQ', icon: HelpCircle },
-  { path: '/register', label: 'Register', icon: ClipboardList },
+  { path: '/guide', label: 'Support', icon: LifeBuoy },
+];
+
+// Auth-only nav items - only visible when logged in
+const authNavItems = [
+  { path: '/participants', label: 'Participants', icon: Users },
+  { path: '/discussion', label: 'Discussion', icon: MessageSquare },
+  { path: '/logistics', label: 'Info', icon: Clipboard },
 ];
 
 interface ProfileData {
@@ -50,6 +66,15 @@ interface ProfileData {
   phone: string;
   headshotUrl: string | null;
   registrationId: string | null;
+}
+
+interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  priority: 'normal' | 'important' | 'urgent';
+  createdAt: Timestamp;
+  createdBy: string;
 }
 
 export default function Layout({ children }: LayoutProps) {
@@ -63,22 +88,77 @@ export default function Layout({ children }: LayoutProps) {
   const [editPhone, setEditPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<Set<string>>(new Set());
   const profileRef = useRef<HTMLDivElement>(null);
+  const announcementsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Close profile dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setProfileOpen(false);
         setEditing(false);
       }
+      if (announcementsRef.current && !announcementsRef.current.contains(event.target as Node)) {
+        setAnnouncementsOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Load read announcement IDs from localStorage
+  useEffect(() => {
+    if (user) {
+      const stored = localStorage.getItem(`readAnnouncements_${user.uid}`);
+      if (stored) {
+        setReadAnnouncementIds(new Set(JSON.parse(stored)));
+      }
+    }
+  }, [user]);
+
+  // Subscribe to announcements
+  useEffect(() => {
+    const q = query(
+      collection(db, 'announcements'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Announcement[];
+      setAnnouncements(data);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Mark announcement as read
+  const markAsRead = (announcementId: string) => {
+    if (!user) return;
+    const newReadIds = new Set(readAnnouncementIds);
+    newReadIds.add(announcementId);
+    setReadAnnouncementIds(newReadIds);
+    localStorage.setItem(`readAnnouncements_${user.uid}`, JSON.stringify([...newReadIds]));
+  };
+
+  // Mark all as read
+  const markAllAsRead = () => {
+    if (!user) return;
+    const newReadIds = new Set(announcements.map(a => a.id));
+    setReadAnnouncementIds(newReadIds);
+    localStorage.setItem(`readAnnouncements_${user.uid}`, JSON.stringify([...newReadIds]));
+  };
+
+  // Count unread announcements
+  const unreadCount = announcements.filter(a => !readAnnouncementIds.has(a.id)).length;
 
   // Fetch profile data when dropdown opens
   useEffect(() => {
@@ -211,7 +291,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen flex flex-col bg-slate-900">
       {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
+      <header className="bg-slate-800 border-b border-slate-700 fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
@@ -221,13 +301,32 @@ export default function Layout({ children }: LayoutProps) {
               </div>
               <div className="hidden sm:block">
                 <div className="text-white font-bold text-lg">BMW Baja Tour</div>
-                <div className="text-slate-400 text-xs">March 2025</div>
+                <div className="text-slate-400 text-xs">March 2026</div>
               </div>
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
+              {/* Public nav items - always visible */}
+              {publicNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                      isActive(item.path)
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+              {/* Auth-only nav items - Discussion & Participants */}
+              {user && authNavItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
@@ -248,6 +347,104 @@ export default function Layout({ children }: LayoutProps) {
 
             {/* Auth & Mobile Menu Button */}
             <div className="flex items-center gap-3">
+              {/* Announcements Bell */}
+              {user && announcements.length > 0 && (
+                <div className="relative" ref={announcementsRef}>
+                  <button
+                    onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+                    className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Announcements Dropdown */}
+                  {announcementsOpen && (
+                    <div className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)] bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden z-50">
+                      {/* Header */}
+                      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Megaphone className="h-5 w-5 text-blue-400" />
+                          <h3 className="text-white font-semibold">Announcements</h3>
+                        </div>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-blue-400 hover:text-blue-300 text-sm"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Announcements List */}
+                      <div className="max-h-96 overflow-y-auto">
+                        {announcements.length === 0 ? (
+                          <div className="p-6 text-center text-slate-400">
+                            No announcements yet
+                          </div>
+                        ) : (
+                          announcements.map((announcement) => {
+                            const isUnread = !readAnnouncementIds.has(announcement.id);
+                            const priorityColors = {
+                              normal: 'border-l-slate-500',
+                              important: 'border-l-amber-500',
+                              urgent: 'border-l-red-500'
+                            };
+
+                            return (
+                              <div
+                                key={announcement.id}
+                                onClick={() => markAsRead(announcement.id)}
+                                className={`p-4 border-b border-slate-700 last:border-0 cursor-pointer hover:bg-slate-700/50 transition-colors border-l-4 ${priorityColors[announcement.priority]} ${isUnread ? 'bg-slate-700/30' : ''}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  {isUnread && (
+                                    <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h4 className={`font-medium ${isUnread ? 'text-white' : 'text-slate-300'}`}>
+                                        {announcement.title}
+                                      </h4>
+                                      {announcement.priority === 'urgent' && (
+                                        <span className="px-1.5 py-0.5 bg-red-600/20 text-red-400 text-xs rounded">
+                                          Urgent
+                                        </span>
+                                      )}
+                                      {announcement.priority === 'important' && (
+                                        <span className="px-1.5 py-0.5 bg-amber-600/20 text-amber-400 text-xs rounded">
+                                          Important
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className={`text-sm ${isUnread ? 'text-slate-300' : 'text-slate-400'}`}>
+                                      {announcement.message}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-2">
+                                      {announcement.createdAt?.toDate().toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Auth Button / Profile Dropdown */}
               {!loading && (
                 <div className="hidden sm:block">
@@ -402,8 +599,82 @@ export default function Layout({ children }: LayoutProps) {
                                 )}
                               </div>
 
-                              {/* Logout Button */}
-                              <div className="p-3 border-t border-slate-700">
+                              {/* Admin Section - Only for admin */}
+                              {user?.uid === ADMIN_UID && (
+                                <div className="px-4 pb-3 border-b border-slate-700">
+                                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 px-1">Admin</p>
+                                  <div className="space-y-1">
+                                    <Link
+                                      to="/admin"
+                                      onClick={() => setProfileOpen(false)}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                    >
+                                      <Settings className="h-4 w-4" />
+                                      Dashboard
+                                    </Link>
+                                    <Link
+                                      to="/admin/nightly-config"
+                                      onClick={() => setProfileOpen(false)}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                    >
+                                      <Calendar className="h-4 w-4" />
+                                      Daily Config
+                                    </Link>
+                                    <Link
+                                      to="/admin/email-templates"
+                                      onClick={() => setProfileOpen(false)}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                    >
+                                      <Mail className="h-4 w-4" />
+                                      Email Templates
+                                    </Link>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* My Trip Section */}
+                              <div className="px-4 py-3 border-b border-slate-700">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 px-1">My Trip</p>
+                                <div className="space-y-1">
+                                  {profileData?.registrationId && (
+                                    <Link
+                                      to="/my-profile"
+                                      onClick={() => setProfileOpen(false)}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                    >
+                                      <User className="h-4 w-4" />
+                                      My Profile
+                                    </Link>
+                                  )}
+                                  <Link
+                                    to="/my-selections"
+                                    onClick={() => setProfileOpen(false)}
+                                    className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                  >
+                                    <BedDouble className="h-4 w-4" />
+                                    My Ride
+                                  </Link>
+                                  <Link
+                                    to="/my-documents"
+                                    onClick={() => setProfileOpen(false)}
+                                    className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                    My Documents
+                                  </Link>
+                                  <Link
+                                    to="/my-ledger"
+                                    onClick={() => setProfileOpen(false)}
+                                    className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                  >
+                                    <Receipt className="h-4 w-4" />
+                                    My Ledger
+                                  </Link>
+                                </div>
+                              </div>
+
+                              {/* Sign Out */}
+                              <div className="p-3">
                                 <button
                                   onClick={() => {
                                     logout();
@@ -424,10 +695,9 @@ export default function Layout({ children }: LayoutProps) {
                   ) : (
                     <button
                       onClick={handleSignIn}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
                     >
-                      <LogIn className="h-4 w-4" />
-                      Create Account / Sign In
+                      Join the Tour
                     </button>
                   )}
                 </div>
@@ -452,7 +722,27 @@ export default function Layout({ children }: LayoutProps) {
         {mobileMenuOpen && (
           <div className="md:hidden bg-slate-800 border-t border-slate-700">
             <nav className="px-4 py-3 space-y-1">
-              {navItems.map((item) => {
+              {/* Public nav items - always visible */}
+              {publicNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      isActive(item.path)
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+              {/* Auth-only nav items - Discussion & Participants */}
+              {user && authNavItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
@@ -471,18 +761,12 @@ export default function Layout({ children }: LayoutProps) {
                 );
               })}
 
-              {/* Mobile Auth */}
+              {/* Mobile Auth Section */}
               <div className="pt-3 border-t border-slate-700 mt-3">
                 {user ? (
-                  <div className="space-y-2">
-                    {/* Profile Button */}
-                    <button
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        setProfileOpen(true);
-                      }}
-                      className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-slate-700 transition-colors"
-                    >
+                  <div className="space-y-1">
+                    {/* Profile Header */}
+                    <div className="flex items-center gap-3 px-4 py-3">
                       <img
                         src={profileData?.headshotUrl || user.photoURL || '/default-avatar.png'}
                         alt={profileData?.fullName || user.displayName || 'User'}
@@ -494,19 +778,110 @@ export default function Layout({ children }: LayoutProps) {
                         </p>
                         <p className="text-slate-400 text-sm">{user.email}</p>
                       </div>
-                    </button>
-                    {/* Logout Button */}
-                    <button
-                      onClick={() => {
-                        logout();
-                        setMobileMenuOpen(false);
-                        setProfileData(null);
-                      }}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:bg-red-600/10 rounded-lg transition-colors"
-                    >
-                      <LogOut className="h-5 w-5" />
-                      <span>Sign Out</span>
-                    </button>
+                    </div>
+
+                    {/* Admin Section - Only for admin */}
+                    {user.uid === ADMIN_UID && (
+                      <div className="pt-2 pb-1">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider px-4 mb-1">Admin</p>
+                        <Link
+                          to="/admin"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Settings className="h-5 w-5" />
+                          <span>Dashboard</span>
+                        </Link>
+                        <Link
+                          to="/admin/nightly-config"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Calendar className="h-5 w-5" />
+                          <span>Daily Config</span>
+                        </Link>
+                        <Link
+                          to="/admin/email-templates"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Mail className="h-5 w-5" />
+                          <span>Email Templates</span>
+                        </Link>
+                      </div>
+                    )}
+
+                    {/* My Trip Section */}
+                    <div className="pt-2 pb-1">
+                      <p className="text-xs text-slate-500 uppercase tracking-wider px-4 mb-1">My Trip</p>
+                      {profileData?.registrationId && (
+                        <Link
+                          to="/my-profile"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <User className="h-5 w-5" />
+                          <span>My Profile</span>
+                        </Link>
+                      )}
+                      <Link
+                        to="/my-selections"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <BedDouble className="h-5 w-5" />
+                        <span>My Ride</span>
+                      </Link>
+                      <Link
+                        to="/my-documents"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <FileText className="h-5 w-5" />
+                        <span>My Documents</span>
+                      </Link>
+                      <Link
+                        to="/my-ledger"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <Receipt className="h-5 w-5" />
+                        <span>My Ledger</span>
+                      </Link>
+                      {/* Announcements */}
+                      {announcements.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            setAnnouncementsOpen(true);
+                          }}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Bell className="h-5 w-5" />
+                          <span>Announcements</span>
+                          {unreadCount > 0 && (
+                            <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                              {unreadCount}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Sign Out */}
+                    <div className="pt-2">
+                      <button
+                        onClick={() => {
+                          logout();
+                          setMobileMenuOpen(false);
+                          setProfileData(null);
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:bg-red-600/10 rounded-lg transition-colors"
+                      >
+                        <LogOut className="h-5 w-5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <button
@@ -514,10 +889,9 @@ export default function Layout({ children }: LayoutProps) {
                       handleSignIn();
                       setMobileMenuOpen(false);
                     }}
-                    className="flex items-center gap-3 w-full px-4 py-3 bg-blue-600 text-white rounded-lg"
+                    className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium"
                   >
-                    <LogIn className="h-5 w-5" />
-                    <span>Create Account / Sign In</span>
+                    Join the Tour
                   </button>
                 )}
               </div>
@@ -527,7 +901,7 @@ export default function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main className="flex-1 pt-16">
         {children}
       </main>
 
@@ -539,8 +913,14 @@ export default function Layout({ children }: LayoutProps) {
               <Bike className="h-5 w-5" />
               <span>BMW Motorcycle Club - Baja Tour 2026</span>
             </div>
-            <div className="text-slate-500 text-sm">
-              March 19-27, 2026 • El Cajon to Death Valley
+            <div className="flex items-center gap-4 text-sm">
+              <Link to="/guide" className="text-slate-400 hover:text-white transition-colors">
+                User Guide
+              </Link>
+              <Link to="/faq" className="text-slate-400 hover:text-white transition-colors">
+                FAQ
+              </Link>
+              <span className="text-slate-500">March 19-27, 2026</span>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronUp,
@@ -15,7 +16,8 @@ import {
   Wrench,
   DollarSign,
   Tent,
-  Info
+  Info,
+  BookOpen
 } from 'lucide-react';
 
 interface FAQItem {
@@ -47,7 +49,13 @@ If you don't have someone to ride with, we will help you find a group.`
     id: 'about-3',
     category: 'About the Ride',
     question: 'What should I expect?',
-    answer: `You have to be easy going and go with the flow. There might be some issues - you might have to share a room with someone who snores. Don't complain, consider it part of the adventure!
+    answer: `Expect to have a great time with a great group of riders. Think of it a bit like the Range of Light but more days :)
+
+Expect the unexpected - both positive and on the challenging side. You will be in small and sometimes remote towns. There isn't a BMW dealer in the next town. You won't find a gigantic Walmart after we depart Ensenada. This is all part of the adventure.
+
+You will experience wonderful people, awesome beaches, great food, lots of exploration, and lasting friendships.
+
+You have to be easy going and go with the flow. There might be some issues - you might have to share a room with someone who snores. Don't complain, consider it part of the adventure!
 
 **Prima donnas or those expecting a "tour" experience should consider alternatives.**
 
@@ -82,7 +90,13 @@ This approach makes it easier to organize and manage.`
     id: 'about-6',
     category: 'About the Ride',
     question: 'Is this ride right for me?',
-    answer: `We have done this ride a few times now and thankfully it's always worked out - everyone was on the same page and had a great time.
+    answer: `**This ride is for you if you...**
+• Like an adventure and have the attitude that issues and challenges add to the adventure
+• Love hanging out with the people you meet at BMW NorCal campouts
+• Have a positive attitude and provide more solutions than criticism
+• Are comfortable riding 6-8 hours a day for 8 days
+
+We have done this ride a few times now and thankfully it's always worked out - everyone was on the same page and had a great time.
 
 If you don't understand this vibe or have questions, let us know and we are happy to give you a call and provide more details to help you decide if this is the ride for you.
 
@@ -131,9 +145,9 @@ Coverage should include liability, collision, and medical. Expect to pay around 
     id: '5',
     category: 'Bike Preparation',
     question: 'What type of motorcycle is suitable for this trip?',
-    answer: `This trip is designed for BMW motorcycles. Most participants ride BMW GS models of all sizes.
+    answer: `This trip is designed for BMW motorcycles. Most participants ride BMW GS models of all sizes. The primary roads are all paved and suitable for any reliable, well-maintained motorcycle.
 
-While all riders can take their own routes, the provided route is all paved and suitable for all motorcycles. However, short portions of dirt and sand are unavoidable, especially when getting to camps and hotels.`
+There will be short sections of dirt and sand, primarily getting to certain hotels or campsites, so keep that in mind. If that's an issue, talk with us first - we can help you find options that avoid the dirt and sand.`
   },
   {
     id: '6',
@@ -182,6 +196,22 @@ If we do this again, all riders can choose to participate in the group plans whi
 • Bring a small fuel bladder if your bike has limited range
 • Premium (Premium) is recommended for most adventure bikes
 • Pay in pesos for better rates (ATMs are available in larger towns)`
+  },
+  {
+    id: '14',
+    category: 'Costs & Logistics',
+    question: 'Why do I have to pay a deposit?',
+    answer: `It takes a huge amount of work to organize a ride like this, and the larger the group the more organization required. We have to reserve hotels and arrange meals in advance, and this often requires paying in advance.
+
+Also, we make plans based on the number of registered riders and need to know each rider is committed to the ride. The deposit helps ensure we have accurate numbers for planning.`
+  },
+  {
+    id: '15',
+    category: 'Costs & Logistics',
+    question: 'Can I get my deposit back if my plans change?',
+    answer: `Maybe, but there are no promises. If we can replace your spot, we can refund your unused and uncommitted funds. You can arrange for a refund of the spent funds directly from the person replacing you.
+
+So we are all on the same page: the better your attitude is, the more likely we will help find a way to recoup your deposit.`
   },
   // Safety & Medical
   {
@@ -290,9 +320,16 @@ export default function FAQPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-white mb-4">Frequently Asked Questions</h1>
-          <p className="text-slate-400">
+          <p className="text-slate-400 mb-6">
             Everything you need to know about the Baja Tour 2026
           </p>
+          <Link
+            to="/guide"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition-colors"
+          >
+            <BookOpen className="h-4 w-4" />
+            View User Guide
+          </Link>
         </div>
 
         {/* FAQ Categories */}

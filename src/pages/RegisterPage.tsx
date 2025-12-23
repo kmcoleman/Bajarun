@@ -59,6 +59,10 @@ interface FormData {
 
   // Accommodation Preferences
   hasPillion: boolean;
+  pillionName: string;
+  pillionNickname: string;
+  pillionPhone: string;
+  pillionEmail: string;
   accommodationPreference: 'camping' | 'hotels' | 'either';
   flexibleAccommodations: boolean;
   okSharingSameGender: boolean;
@@ -102,6 +106,10 @@ const initialFormData: FormData = {
   spanishLevel: 'gringo',
   passportValid: true,
   hasPillion: false,
+  pillionName: '',
+  pillionNickname: '',
+  pillionPhone: '',
+  pillionEmail: '',
   accommodationPreference: 'either',
   flexibleAccommodations: false,
   okSharingSameGender: false,
@@ -127,6 +135,7 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showPillionModal, setShowPillionModal] = useState(false);
   const [headshotFile, setHeadshotFile] = useState<File | null>(null);
   const [headshotPreview, setHeadshotPreview] = useState<string | null>(null);
   const [existingRegistrationId, setExistingRegistrationId] = useState<string | null>(null);
@@ -178,6 +187,10 @@ export default function RegisterPage() {
             spanishLevel: data.spanishLevel || 'gringo',
             passportValid: data.passportValid ?? true,
             hasPillion: data.hasPillion ?? false,
+            pillionName: data.pillionName || '',
+            pillionNickname: data.pillionNickname || '',
+            pillionPhone: data.pillionPhone || '',
+            pillionEmail: data.pillionEmail || '',
             accommodationPreference: data.accommodationPreference || 'either',
             flexibleAccommodations: data.flexibleAccommodations ?? false,
             okSharingSameGender: data.okSharingSameGender ?? false,
@@ -282,6 +295,11 @@ export default function RegisterPage() {
         headshotUrl = await getDownloadURL(storageRef);
       }
 
+      // Calculate required deposit
+      // Base: $500 for group plan, $100 otherwise. Double if rider has a pillion.
+      const baseDeposit = formData.participateGroup ? 500 : 100;
+      const depositRequired = formData.hasPillion ? baseDeposit * 2 : baseDeposit;
+
       if (existingRegistrationId) {
         // Update existing registration
         const registrationRef = doc(db, 'registrations', existingRegistrationId);
@@ -289,6 +307,7 @@ export default function RegisterPage() {
           ...formData,
           email: user.email,
           headshotUrl,
+          depositRequired,
           updatedAt: serverTimestamp()
         });
       } else {
@@ -298,7 +317,9 @@ export default function RegisterPage() {
           email: user.email,
           uid: user.uid,
           headshotUrl,
+          depositRequired,
           depositPaid: 0,
+          amtCollected: 0,
           createdAt: serverTimestamp()
         });
       }
@@ -784,7 +805,10 @@ export default function RegisterPage() {
                       type="radio"
                       name="hasPillion"
                       checked={formData.hasPillion === true}
-                      onChange={() => updateField('hasPillion', true)}
+                      onChange={() => {
+                        updateField('hasPillion', true);
+                        setShowPillionModal(true);
+                      }}
                       className="sr-only"
                     />
                     Yes
@@ -798,12 +822,52 @@ export default function RegisterPage() {
                       type="radio"
                       name="hasPillion"
                       checked={formData.hasPillion === false}
-                      onChange={() => updateField('hasPillion', false)}
+                      onChange={() => {
+                        updateField('hasPillion', false);
+                        // Clear pillion data when switching to No
+                        updateField('pillionName', '');
+                        updateField('pillionNickname', '');
+                        updateField('pillionPhone', '');
+                        updateField('pillionEmail', '');
+                      }}
                       className="sr-only"
                     />
                     No
                   </label>
                 </div>
+
+                {/* Show pillion info if filled in */}
+                {formData.hasPillion && formData.pillionName && (
+                  <div className="mt-4 p-4 bg-blue-600/10 border border-blue-500/30 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-white font-medium">{formData.pillionName}</p>
+                        {formData.pillionNickname && (
+                          <p className="text-slate-400 text-sm">"{formData.pillionNickname}"</p>
+                        )}
+                        <p className="text-slate-400 text-sm">{formData.pillionEmail}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPillionModal(true)}
+                        className="text-blue-400 hover:text-blue-300 text-sm"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Prompt to add pillion info */}
+                {formData.hasPillion && !formData.pillionName && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPillionModal(true)}
+                    className="mt-4 w-full p-4 bg-amber-600/10 border border-amber-500/30 rounded-lg text-amber-300 hover:bg-amber-600/20 transition-colors"
+                  >
+                    Click to add pillion details (required)
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -1243,10 +1307,112 @@ export default function RegisterPage() {
         </form>
       </div>
 
+      {/* Pillion Details Modal */}
+      {showPillionModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Pillion Details</h2>
+                <button
+                  onClick={() => setShowPillionModal(false)}
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-slate-400" />
+                </button>
+              </div>
+              <p className="text-slate-400 text-sm mt-2">
+                Please provide details about your passenger.
+              </p>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.pillionName}
+                  onChange={(e) => updateField('pillionName', e.target.value)}
+                  placeholder="Pillion's full name"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Nickname (optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.pillionNickname}
+                  onChange={(e) => updateField('pillionNickname', e.target.value)}
+                  placeholder="What should we call them?"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.pillionPhone}
+                  onChange={(e) => updateField('pillionPhone', e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={formData.pillionEmail}
+                  onChange={(e) => updateField('pillionEmail', e.target.value)}
+                  placeholder="pillion@example.com"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="p-4 bg-blue-600/10 border border-blue-500/30 rounded-lg">
+                <p className="text-blue-300 text-sm">
+                  <strong>Note:</strong> Having a pillion doubles your deposit requirement.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-slate-700">
+              <button
+                type="button"
+                onClick={() => setShowPillionModal(false)}
+                disabled={!formData.pillionName || !formData.pillionPhone || !formData.pillionEmail}
+                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Save Pillion Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Deposit Modal */}
       {showDepositModal && (() => {
         // Calculate deposit amounts
-        const requiredDeposit = formData.participateGroup ? 500 : 100;
+        // Base deposit: $500 for group plan, $100 otherwise
+        // Double if rider has a pillion (passenger)
+        const baseDeposit = formData.participateGroup ? 500 : 100;
+        const requiredDeposit = formData.hasPillion ? baseDeposit * 2 : baseDeposit;
         const amountDue = Math.max(0, requiredDeposit - existingDepositPaid);
         const isFullyPaid = amountDue <= 0;
 

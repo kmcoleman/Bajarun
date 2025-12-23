@@ -117,6 +117,14 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
     const waypoints: [number, number][] = [];
 
     itineraryData.forEach((day) => {
+      // Add any intermediate waypoints for this day
+      if (day.waypoints && day.waypoints.length > 0) {
+        day.waypoints.forEach(wp => {
+          const wpCoord: [number, number] = [wp[1], wp[0]]; // Convert [lat, lng] to [lng, lat] for Mapbox
+          waypoints.push(wpCoord);
+        });
+      }
+
       // Add end point of each day (which is the destination)
       const endCoord: [number, number] = [day.coordinates.end[1], day.coordinates.end[0]];
 
