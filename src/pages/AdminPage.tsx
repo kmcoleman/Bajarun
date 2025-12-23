@@ -2925,37 +2925,115 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    {/* Nightly Selections */}
+                    {/* Detailed Nightly Selections */}
                     {userData?.selections && Object.keys(userData.selections).length > 0 && (
                       <div className="mt-6 pt-6 border-t border-slate-700">
-                        <p className="text-slate-500 text-sm mb-3">Nightly Selections</p>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          {TRIP_NIGHTS.map((night, idx) => {
+                        <p className="text-slate-500 text-sm mb-3">Detailed Nightly Selections</p>
+                        <div className="space-y-3">
+                          {TRIP_NIGHTS.map((night) => {
                             const sel = userData.selections[night.key];
-                            const accom = sel?.accommodation;
-                            let bgColor = 'bg-slate-700';
-                            let textColor = 'text-slate-400';
-                            let label = 'Not set';
+                            const config = nightConfigs[night.key];
+                            if (!sel?.accommodation) return null;
+
+                            const accom = sel.accommodation;
+                            let accomIcon = <UserX className="h-4 w-4" />;
+                            let accomLabel = 'Own';
+                            let accomColor = 'text-slate-400';
                             if (accom === 'hotel') {
-                              bgColor = 'bg-blue-600/20';
-                              textColor = 'text-blue-400';
-                              label = 'Hotel';
+                              accomIcon = <Hotel className="h-4 w-4" />;
+                              accomLabel = 'Hotel';
+                              accomColor = 'text-blue-400';
                             } else if (accom === 'camping') {
-                              bgColor = 'bg-green-600/20';
-                              textColor = 'text-green-400';
-                              label = 'Camping';
-                            } else if (accom === 'own') {
-                              bgColor = 'bg-amber-600/20';
-                              textColor = 'text-amber-400';
-                              label = 'Own';
+                              accomIcon = <Tent className="h-4 w-4" />;
+                              accomLabel = 'Camping';
+                              accomColor = 'text-green-400';
                             }
+
+                            // Calculate night cost
+                            let nightCost = 0;
+                            if (config) {
+                              if (accom === 'hotel' && config.hotelAvailable) nightCost += config.hotelCost;
+                              else if (accom === 'camping' && config.campingAvailable) nightCost += config.campingCost;
+                              if (sel.dinner && config.dinnerAvailable) nightCost += config.dinnerCost;
+                              if (sel.breakfast && config.breakfastAvailable) nightCost += config.breakfastCost;
+                              if (config.optionalActivities && sel.optionalActivitiesInterested) {
+                                config.optionalActivities.forEach(act => {
+                                  if (sel.optionalActivitiesInterested.includes(act.id)) nightCost += act.cost;
+                                });
+                              }
+                            }
+
                             return (
-                              <div key={night.key} className={`${bgColor} rounded-lg p-3 text-center`}>
-                                <p className="text-xs text-slate-500 mb-1">Night {idx + 1}</p>
-                                <p className={`font-medium ${textColor}`}>{label}</p>
+                              <div key={night.key} className="bg-slate-900/50 rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-medium text-white">{night.label}</span>
+                                  <span className="text-slate-400 text-sm">${nightCost}</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {/* Accommodation */}
+                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${accomColor} bg-slate-800`}>
+                                    {accomIcon} {accomLabel}
+                                  </span>
+                                  {/* Single Room */}
+                                  {sel.prefersSingleRoom && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-purple-400 bg-slate-800">
+                                      <UserRound className="h-3 w-3" /> Single Room
+                                    </span>
+                                  )}
+                                  {/* Floor Sleeping */}
+                                  {sel.prefersFloorSleeping && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-cyan-400 bg-slate-800">
+                                      Floor Sleep
+                                    </span>
+                                  )}
+                                  {/* Dinner */}
+                                  {sel.dinner && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-amber-400 bg-slate-800">
+                                      <UtensilsCrossed className="h-3 w-3" /> Dinner
+                                    </span>
+                                  )}
+                                  {/* Breakfast */}
+                                  {sel.breakfast && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-orange-400 bg-slate-800">
+                                      <Coffee className="h-3 w-3" /> Breakfast
+                                    </span>
+                                  )}
+                                  {/* Optional Activities */}
+                                  {sel.optionalActivitiesInterested && sel.optionalActivitiesInterested.length > 0 && config?.optionalActivities && (
+                                    sel.optionalActivitiesInterested.map(actId => {
+                                      const act = config.optionalActivities?.find(a => a.id === actId);
+                                      return act ? (
+                                        <span key={actId} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-emerald-400 bg-slate-800">
+                                          <Compass className="h-3 w-3" /> {act.title}
+                                        </span>
+                                      ) : null;
+                                    })
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
+                        </div>
+                        {/* Estimated Total */}
+                        <div className="mt-4 pt-4 border-t border-slate-700 flex justify-between items-center">
+                          <span className="text-slate-400 font-medium">Estimated Total (from selections)</span>
+                          <span className="text-xl font-bold text-white">
+                            ${TRIP_NIGHTS.reduce((total, night) => {
+                              const sel = userData.selections[night.key];
+                              const config = nightConfigs[night.key];
+                              if (!sel || !config) return total;
+                              if (sel.accommodation === 'hotel' && config.hotelAvailable) total += config.hotelCost;
+                              else if (sel.accommodation === 'camping' && config.campingAvailable) total += config.campingCost;
+                              if (sel.dinner && config.dinnerAvailable) total += config.dinnerCost;
+                              if (sel.breakfast && config.breakfastAvailable) total += config.breakfastCost;
+                              if (config.optionalActivities && sel.optionalActivitiesInterested) {
+                                config.optionalActivities.forEach(act => {
+                                  if (sel.optionalActivitiesInterested.includes(act.id)) total += act.cost;
+                                });
+                              }
+                              return total;
+                            }, 0).toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     )}
