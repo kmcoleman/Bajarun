@@ -1,0 +1,23 @@
+Night,Type,Name,Lat,Lng,Category,Description,Phone,Hours,Distance,Time
+1,START,Temecula CA,33.4936,-117.1484,,,,,250,6 hours
+1,END,San Quintin,30.5568,-115.9464,,,,,,
+1,WAYPOINT,,32.5000,-116.8000,,,,,,
+1,POI,Pemex - Ensenada,31.8667,-116.5833,gas,Large Pemex station - last reliable gas before rural stretch,+52 646 178 1234,24 hours,,
+1,POI,Tacos El Fenix,31.7500,-116.4500,restaurant,Famous fish tacos - cash only,,7am-6pm,,
+1,POI,La Bufadora Viewpoint,31.7181,-116.7142,viewpoint,Spectacular blowhole and ocean views,,,,,
+2,START,San Quintin,30.5568,-115.9464,,,,,180,5 hours
+2,END,Guerrero Negro,27.9677,-114.0611,,,,,,
+2,POI,Pemex - El Rosario,30.0600,-115.7281,gas,Last gas before long desert stretch,,,,,
+2,POI,Cataviña Boulders,29.7333,-114.7167,photo,Iconic boulder field - great photo stop,,,,,
+3,START,Guerrero Negro,27.9677,-114.0611,,,,,200,6 hours
+3,END,San Ignacio,27.2900,-112.9000,,,,,,
+4,START,San Ignacio,27.2900,-112.9000,,,,,150,4 hours
+4,END,Mulege,26.8833,-111.9833,,,,,,
+5,START,Mulege,26.8833,-111.9833,,,,,130,3 hours
+5,END,Loreto,26.0125,-111.3486,,,,,,
+6,START,Loreto,26.0125,-111.3486,,,,,220,5 hours
+6,END,La Paz,24.1426,-110.3128,,,,,,
+7,START,La Paz,24.1426,-110.3128,,,,,180,5 hours
+7,END,Todos Santos,23.4500,-110.2167,,,,,,
+8,START,Todos Santos,23.4500,-110.2167,,,,,100,3 hours
+8,END,Cabo San Lucas,22.8905,-109.9167,,,,,,

@@ -7,7 +7,7 @@
  * - Miles, time, accommodations, points of interest
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   MapPin,
   Clock,
@@ -19,16 +19,44 @@ import {
   Calendar,
   Tent,
   ExternalLink,
-  Info
+  Info,
+  Map
 } from 'lucide-react';
 import { itineraryData, tripSummary, totalMiles, type DayItinerary } from '../data/itinerary';
 import RouteMap from '../components/RouteMap';
+import DayRouteMap from '../components/DayRouteMap';
+import { db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import type { NightConfig } from '../types/eventConfig';
 
 export default function ItineraryPage() {
   const [expandedDay, setExpandedDay] = useState<number | null>(1);
+  const [nightConfigs, setNightConfigs] = useState<{ [key: string]: NightConfig }>({});
+
+  // Fetch route configs from Firestore
+  useEffect(() => {
+    async function loadConfigs() {
+      try {
+        const docRef = doc(db, 'eventConfig', 'pricing');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().nights) {
+          setNightConfigs(docSnap.data().nights);
+        }
+      } catch (error) {
+        console.error('Error loading route configs:', error);
+      }
+    }
+    loadConfigs();
+  }, []);
 
   const toggleDay = (day: number) => {
     setExpandedDay(expandedDay === day ? null : day);
+  };
+
+  // Get route config for a specific day
+  const getRouteConfig = (dayNumber: number) => {
+    const nightKey = `night-${dayNumber}`;
+    return nightConfigs[nightKey]?.routeConfig;
   };
 
   return (
@@ -84,6 +112,7 @@ export default function ItineraryPage() {
               day={day}
               isExpanded={expandedDay === day.day}
               onToggle={() => toggleDay(day.day)}
+              routeConfig={getRouteConfig(day.day)}
             />
           ))}
         </div>
@@ -96,10 +125,12 @@ interface DayCardProps {
   day: DayItinerary;
   isExpanded: boolean;
   onToggle: () => void;
+  routeConfig?: import('../types/routeConfig').RouteConfig;
 }
 
-function DayCard({ day, isExpanded, onToggle }: DayCardProps) {
+function DayCard({ day, isExpanded, onToggle, routeConfig }: DayCardProps) {
   const isRestDay = day.miles === 0;
+  const hasRouteMap = routeConfig?.startCoordinates?.lat && routeConfig?.endCoordinates?.lat;
 
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
@@ -137,6 +168,12 @@ function DayCard({ day, isExpanded, onToggle }: DayCardProps) {
 
         {/* Expand/Collapse icon */}
         <div className="flex items-center gap-4">
+          {hasRouteMap && (
+            <span className="hidden sm:inline-flex items-center gap-1 px-3 py-1 bg-indigo-600/20 text-indigo-400 rounded-full text-sm">
+              <Map className="h-4 w-4" />
+              Route Map
+            </span>
+          )}
           {isRestDay && (
             <span className="hidden sm:inline-flex items-center gap-1 px-3 py-1 bg-green-600/20 text-green-400 rounded-full text-sm">
               <Star className="h-4 w-4" />
@@ -154,7 +191,18 @@ function DayCard({ day, isExpanded, onToggle }: DayCardProps) {
       {/* Expanded Content */}
       {isExpanded && (
         <div className="px-6 pb-6 border-t border-slate-700">
-          <div className="pt-6 grid md:grid-cols-2 gap-6">
+          {/* Day Route Map */}
+          {hasRouteMap && (
+            <div className="pt-6">
+              <DayRouteMap
+                routeConfig={routeConfig}
+                day={day.day}
+                height="300px"
+              />
+            </div>
+          )}
+
+          <div className={`${hasRouteMap ? 'pt-4' : 'pt-6'} grid md:grid-cols-2 gap-6`}>
             {/* Left Column - Description */}
             <div>
               <p className="text-slate-300 mb-6">{day.description}</p>
