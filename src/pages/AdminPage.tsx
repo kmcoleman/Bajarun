@@ -272,7 +272,7 @@ export default function AdminPage() {
   // Fetch accommodations data when tab is selected (needed for Rider Prefs, Ledger, and Roster)
   useEffect(() => {
     async function fetchAccommodations() {
-      if (!isAdmin || (activeTab !== 'accommodations' && activeTab !== 'ledger' && activeTab !== 'roster')) return;
+      if (!isAdmin || (activeTab !== 'accommodations' && activeTab !== 'ledger' && activeTab !== 'roster' && activeTab !== 'profileViewer')) return;
       if (userAccommodations.length > 0) return; // Already loaded
 
       setLoadingAccommodations(true);
@@ -668,19 +668,24 @@ export default function AdminPage() {
     }
   };
 
-  // Post announcement
+  // Post announcement and send push notifications
   const handlePostAnnouncement = async () => {
     if (!announcementTitle.trim() || !announcementMessage.trim() || !user) return;
 
     setPostingAnnouncement(true);
     try {
-      await addDoc(collection(db, 'announcements'), {
+      // Call Cloud Function to save announcement AND send push notifications
+      const sendPushNotificationFn = httpsCallable(functions, 'sendPushNotification');
+      const result = await sendPushNotificationFn({
         title: announcementTitle.trim(),
-        message: announcementMessage.trim(),
-        priority: announcementPriority,
-        createdAt: serverTimestamp(),
-        createdBy: user.uid
+        body: announcementMessage.trim(),
+        priority: announcementPriority === 'urgent' ? 'high' : 'normal',
       });
+
+      const data = result.data as { sent: number; failed: number; announcementId: string };
+
+      // Show success message with delivery stats
+      alert(`Announcement posted!\nDelivered to ${data.sent} device(s)${data.failed > 0 ? `, ${data.failed} failed` : ''}`);
 
       // Clear form
       setAnnouncementTitle('');

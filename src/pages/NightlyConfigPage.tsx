@@ -134,13 +134,13 @@ export default function NightlyConfigPage() {
 
   // Waypoint helpers
   const addWaypoint = () => {
-    const waypoints = [...(routeConfig.waypoints || []), [0, 0] as [number, number]];
+    const waypoints = [...(routeConfig.waypoints || []), { lat: 0, lng: 0 }];
     updateRouteField('waypoints', waypoints);
   };
 
   const updateWaypoint = (index: number, lat: number, lng: number) => {
     const waypoints = [...(routeConfig.waypoints || [])];
-    waypoints[index] = [lat, lng];
+    waypoints[index] = { lat, lng };
     updateRouteField('waypoints', waypoints);
   };
 
@@ -154,7 +154,7 @@ export default function NightlyConfigPage() {
     const newPOI: POI = {
       id: `poi-${Date.now()}`,
       name: '',
-      coordinates: [0, 0],
+      coordinates: { lat: 0, lng: 0 },
       category: 'poi',
       description: ''
     };
@@ -912,8 +912,8 @@ export default function NightlyConfigPage() {
                     <input
                       type="number"
                       step="0.0001"
-                      value={routeConfig.startCoordinates[0] || ''}
-                      onChange={(e) => updateRouteField('startCoordinates', [parseFloat(e.target.value) || 0, routeConfig.startCoordinates[1]])}
+                      value={routeConfig.startCoordinates?.lat || ''}
+                      onChange={(e) => updateRouteField('startCoordinates', { lat: parseFloat(e.target.value) || 0, lng: routeConfig.startCoordinates?.lng || 0 })}
                       placeholder="33.4936"
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                     />
@@ -925,8 +925,8 @@ export default function NightlyConfigPage() {
                     <input
                       type="number"
                       step="0.0001"
-                      value={routeConfig.startCoordinates[1] || ''}
-                      onChange={(e) => updateRouteField('startCoordinates', [routeConfig.startCoordinates[0], parseFloat(e.target.value) || 0])}
+                      value={routeConfig.startCoordinates?.lng || ''}
+                      onChange={(e) => updateRouteField('startCoordinates', { lat: routeConfig.startCoordinates?.lat || 0, lng: parseFloat(e.target.value) || 0 })}
                       placeholder="-117.1484"
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                     />
@@ -962,8 +962,8 @@ export default function NightlyConfigPage() {
                     <input
                       type="number"
                       step="0.0001"
-                      value={routeConfig.endCoordinates[0] || ''}
-                      onChange={(e) => updateRouteField('endCoordinates', [parseFloat(e.target.value) || 0, routeConfig.endCoordinates[1]])}
+                      value={routeConfig.endCoordinates?.lat || ''}
+                      onChange={(e) => updateRouteField('endCoordinates', { lat: parseFloat(e.target.value) || 0, lng: routeConfig.endCoordinates?.lng || 0 })}
                       placeholder="30.4832"
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                     />
@@ -975,8 +975,8 @@ export default function NightlyConfigPage() {
                     <input
                       type="number"
                       step="0.0001"
-                      value={routeConfig.endCoordinates[1] || ''}
-                      onChange={(e) => updateRouteField('endCoordinates', [routeConfig.endCoordinates[0], parseFloat(e.target.value) || 0])}
+                      value={routeConfig.endCoordinates?.lng || ''}
+                      onChange={(e) => updateRouteField('endCoordinates', { lat: routeConfig.endCoordinates?.lat || 0, lng: parseFloat(e.target.value) || 0 })}
                       placeholder="-115.9500"
                       className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                     />
@@ -1041,16 +1041,16 @@ export default function NightlyConfigPage() {
                           <input
                             type="number"
                             step="0.0001"
-                            value={waypoint[0] || ''}
-                            onChange={(e) => updateWaypoint(index, parseFloat(e.target.value) || 0, waypoint[1])}
+                            value={waypoint.lat || ''}
+                            onChange={(e) => updateWaypoint(index, parseFloat(e.target.value) || 0, waypoint.lng)}
                             placeholder="Latitude"
                             className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
                           />
                           <input
                             type="number"
                             step="0.0001"
-                            value={waypoint[1] || ''}
-                            onChange={(e) => updateWaypoint(index, waypoint[0], parseFloat(e.target.value) || 0)}
+                            value={waypoint.lng || ''}
+                            onChange={(e) => updateWaypoint(index, waypoint.lat, parseFloat(e.target.value) || 0)}
                             placeholder="Longitude"
                             className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
                           />
@@ -1152,8 +1152,8 @@ export default function NightlyConfigPage() {
                               <input
                                 type="number"
                                 step="0.0001"
-                                value={poi.coordinates[0] || ''}
-                                onChange={(e) => updatePOI(poi.id, 'coordinates', [parseFloat(e.target.value) || 0, poi.coordinates[1]])}
+                                value={poi.coordinates?.lat || ''}
+                                onChange={(e) => updatePOI(poi.id, 'coordinates', { lat: parseFloat(e.target.value) || 0, lng: poi.coordinates?.lng || 0 })}
                                 placeholder="32.5432"
                                 className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
                               />
@@ -1165,8 +1165,8 @@ export default function NightlyConfigPage() {
                               <input
                                 type="number"
                                 step="0.0001"
-                                value={poi.coordinates[1] || ''}
-                                onChange={(e) => updatePOI(poi.id, 'coordinates', [poi.coordinates[0], parseFloat(e.target.value) || 0])}
+                                value={poi.coordinates?.lng || ''}
+                                onChange={(e) => updatePOI(poi.id, 'coordinates', { lat: poi.coordinates?.lat || 0, lng: parseFloat(e.target.value) || 0 })}
                                 placeholder="-116.9876"
                                 className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
                               />

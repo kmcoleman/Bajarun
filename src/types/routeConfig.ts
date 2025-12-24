@@ -18,12 +18,20 @@ export type POICategory =
   | 'emergency'; // Hospitals, mechanics
 
 /**
+ * Coordinate object (Firestore doesn't support nested arrays)
+ */
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+/**
  * Individual Point of Interest
  */
 export interface POI {
   id: string;
   name: string;
-  coordinates: [number, number]; // [lat, lng]
+  coordinates: Coordinates;
   category: POICategory;
   description: string;
   phone?: string;
@@ -35,15 +43,15 @@ export interface POI {
  */
 export interface RouteConfig {
   // Start location
-  startCoordinates: [number, number]; // [lat, lng]
+  startCoordinates: Coordinates;
   startName: string;
 
   // End location
-  endCoordinates: [number, number]; // [lat, lng]
+  endCoordinates: Coordinates;
   endName: string;
 
   // Routing waypoints (intermediate points for Mapbox Directions API)
-  waypoints: [number, number][]; // Array of [lat, lng]
+  waypoints: Coordinates[];
 
   // Points of Interest along route
   pois: POI[];
@@ -57,9 +65,9 @@ export interface RouteConfig {
  * Empty defaults for initialization
  */
 export const emptyRouteConfig: RouteConfig = {
-  startCoordinates: [0, 0],
+  startCoordinates: { lat: 0, lng: 0 },
   startName: '',
-  endCoordinates: [0, 0],
+  endCoordinates: { lat: 0, lng: 0 },
   endName: '',
   waypoints: [],
   pois: [],

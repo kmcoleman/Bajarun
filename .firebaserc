@@ -1,5 +1,13 @@
 {
   "projects": {
     "default": "bajarun-2026"
+  },
+  "targets": {
+    "bajarun-2026": {
+      "hosting": {
+        "main": ["bajarun-2026"],
+        "pwa": ["app-bajarun-2026"]
+      }
+    }
   }
 }

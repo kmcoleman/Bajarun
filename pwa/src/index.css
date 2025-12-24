@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Safe area insets for notched phones */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Prevent pull-to-refresh on mobile */
+html {
+  overscroll-behavior: none;
+}
+
+/* Smooth scrolling */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbars but keep functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

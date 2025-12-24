@@ -100,6 +100,40 @@ service cloud.firestore {
                      request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
     }
 
+    // Participants collection - for roster (PWA reads this)
+    match /participants/{participantId} {
+      // All authenticated users can read (for roster view)
+      allow read: if request.auth != null;
+      // Only admin can write
+      allow write: if request.auth != null &&
+                      request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
+    // Accommodation Selections - users can read/write their own
+    match /accommodationSelections/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admin can read all
+      allow read: if request.auth != null &&
+                     request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
+    // FCM Tokens - for push notifications
+    match /fcmTokens/{userId} {
+      // Users can write their own token
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // Admin can read all tokens (for sending notifications)
+      allow read: if request.auth != null &&
+                     request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
+    // Config collection - for event configuration
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      // Only admin can write
+      allow write: if request.auth != null &&
+                      request.auth.uid == 'kGEO7bTgqMMsDfXmkumneI44S9H2';
+    }
+
     // Ledger collection - for tracking charges and payments per user
     match /ledger/{userId} {
       // Users can read their own ledger (for viewing statements)
