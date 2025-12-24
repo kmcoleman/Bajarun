@@ -26,12 +26,20 @@ import {
   Compass,
   Plus,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  Route,
+  Fuel,
+  Mountain,
+  Camera,
+  Flag,
+  Cross
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { NightConfig, OptionalActivity } from '../types/eventConfig';
 import { emptyNightConfig, TRIP_NIGHTS } from '../types/eventConfig';
+import type { POI, RouteConfig } from '../types/routeConfig';
+import { POI_CATEGORIES, emptyRouteConfig } from '../types/routeConfig';
 
 const ADMIN_UID = 'kGEO7bTgqMMsDfXmkumneI44S9H2';
 
@@ -76,7 +84,7 @@ export default function NightlyConfigPage() {
   }, [user, isAdmin, authLoading]);
 
   // Update a field in the current night's config
-  const updateField = (field: keyof NightConfig, value: string | number | boolean | OptionalActivity[]) => {
+  const updateField = (field: keyof NightConfig, value: string | number | boolean | OptionalActivity[] | RouteConfig) => {
     setNightConfigs(prev => ({
       ...prev,
       [selectedNight.key]: {
@@ -113,6 +121,63 @@ export default function NightlyConfigPage() {
     const activities = (currentConfig.optionalActivities || []).filter(activity => activity.id !== activityId);
     updateField('optionalActivities', activities);
   };
+
+  // Route configuration helpers
+  const routeConfig = currentConfig.routeConfig || { ...emptyRouteConfig };
+
+  const updateRouteField = (field: keyof RouteConfig, value: RouteConfig[keyof RouteConfig]) => {
+    updateField('routeConfig', {
+      ...routeConfig,
+      [field]: value
+    } as RouteConfig);
+  };
+
+  // Waypoint helpers
+  const addWaypoint = () => {
+    const waypoints = [...(routeConfig.waypoints || []), [0, 0] as [number, number]];
+    updateRouteField('waypoints', waypoints);
+  };
+
+  const updateWaypoint = (index: number, lat: number, lng: number) => {
+    const waypoints = [...(routeConfig.waypoints || [])];
+    waypoints[index] = [lat, lng];
+    updateRouteField('waypoints', waypoints);
+  };
+
+  const removeWaypoint = (index: number) => {
+    const waypoints = (routeConfig.waypoints || []).filter((_, i) => i !== index);
+    updateRouteField('waypoints', waypoints);
+  };
+
+  // POI helpers
+  const addPOI = () => {
+    const newPOI: POI = {
+      id: `poi-${Date.now()}`,
+      name: '',
+      coordinates: [0, 0],
+      category: 'poi',
+      description: ''
+    };
+    const pois = [...(routeConfig.pois || []), newPOI];
+    updateRouteField('pois', pois);
+  };
+
+  const updatePOI = (poiId: string, field: keyof POI, value: POI[keyof POI]) => {
+    const pois = (routeConfig.pois || []).map(poi =>
+      poi.id === poiId ? { ...poi, [field]: value } : poi
+    );
+    updateRouteField('pois', pois);
+  };
+
+  const removePOI = (poiId: string) => {
+    const pois = (routeConfig.pois || []).filter(poi => poi.id !== poiId);
+    updateRouteField('pois', pois);
+  };
+
+  // Check if route is configured
+  const hasRouteConfig = routeConfig.startName || routeConfig.endName ||
+    (routeConfig.waypoints && routeConfig.waypoints.length > 0) ||
+    (routeConfig.pois && routeConfig.pois.length > 0);
 
   // Save configuration to Firestore
   const handleSave = async () => {
@@ -317,7 +382,33 @@ export default function NightlyConfigPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <MapPin className="inline h-4 w-4 mr-1" />
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    value={currentConfig.hotelAddress}
+                    onChange={(e) => updateField('hotelAddress', e.target.value)}
+                    placeholder="123 Main St, Guerrero Negro, BCS, Mexico"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
                 <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={currentConfig.hotelPhone}
+                      onChange={(e) => updateField('hotelPhone', e.target.value)}
+                      placeholder="+52 615 157 0250"
+                      className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">
                       <ExternalLink className="inline h-4 w-4 mr-1" />
@@ -331,19 +422,20 @@ export default function NightlyConfigPage() {
                       className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      <MapPin className="inline h-4 w-4 mr-1" />
-                      Google Maps Link
-                    </label>
-                    <input
-                      type="url"
-                      value={currentConfig.hotelMapsLink}
-                      onChange={(e) => updateField('hotelMapsLink', e.target.value)}
-                      placeholder="https://maps.google.com/..."
-                      className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <MapPin className="inline h-4 w-4 mr-1" />
+                    Google Maps Link
+                  </label>
+                  <input
+                    type="url"
+                    value={currentConfig.hotelMapsLink}
+                    onChange={(e) => updateField('hotelMapsLink', e.target.value)}
+                    placeholder="https://maps.google.com/..."
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
                 </div>
 
                 <div>
@@ -769,6 +861,364 @@ export default function NightlyConfigPage() {
               <p className="text-sm text-slate-400">
                 Optional tours or activities available for this night. Users can indicate their interest.
               </p>
+            </div>
+          </section>
+
+          {/* ROUTE CONFIGURATION SECTION */}
+          <section className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-600/20 rounded-lg flex items-center justify-center">
+                  <Route className="h-5 w-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Route Configuration</h3>
+                  <p className="text-xs text-slate-400">Configure the day's riding route and points of interest</p>
+                </div>
+              </div>
+              {hasRouteConfig && (
+                <span className="px-2 py-1 bg-indigo-600/20 text-indigo-400 text-xs font-medium rounded">
+                  Configured
+                </span>
+              )}
+            </div>
+
+            <div className="p-4 space-y-6">
+              {/* Start Location */}
+              <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">A</span>
+                  </div>
+                  <h4 className="text-sm font-semibold text-green-400 uppercase tracking-wider">Start Location</h4>
+                </div>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="md:col-span-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Location Name
+                    </label>
+                    <input
+                      type="text"
+                      value={routeConfig.startName}
+                      onChange={(e) => updateRouteField('startName', e.target.value)}
+                      placeholder="Temecula, CA"
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Latitude
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={routeConfig.startCoordinates[0] || ''}
+                      onChange={(e) => updateRouteField('startCoordinates', [parseFloat(e.target.value) || 0, routeConfig.startCoordinates[1]])}
+                      placeholder="33.4936"
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Longitude
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={routeConfig.startCoordinates[1] || ''}
+                      onChange={(e) => updateRouteField('startCoordinates', [routeConfig.startCoordinates[0], parseFloat(e.target.value) || 0])}
+                      placeholder="-117.1484"
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* End Location */}
+              <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">B</span>
+                  </div>
+                  <h4 className="text-sm font-semibold text-red-400 uppercase tracking-wider">End Location</h4>
+                </div>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="md:col-span-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Location Name
+                    </label>
+                    <input
+                      type="text"
+                      value={routeConfig.endName}
+                      onChange={(e) => updateRouteField('endName', e.target.value)}
+                      placeholder="San Quintin"
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Latitude
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={routeConfig.endCoordinates[0] || ''}
+                      onChange={(e) => updateRouteField('endCoordinates', [parseFloat(e.target.value) || 0, routeConfig.endCoordinates[1]])}
+                      placeholder="30.4832"
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Longitude
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={routeConfig.endCoordinates[1] || ''}
+                      onChange={(e) => updateRouteField('endCoordinates', [routeConfig.endCoordinates[0], parseFloat(e.target.value) || 0])}
+                      placeholder="-115.9500"
+                      className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Route Metadata */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Estimated Distance (miles)
+                  </label>
+                  <input
+                    type="number"
+                    value={routeConfig.estimatedDistance || ''}
+                    onChange={(e) => updateRouteField('estimatedDistance', parseFloat(e.target.value) || undefined)}
+                    placeholder="250"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Estimated Time
+                  </label>
+                  <input
+                    type="text"
+                    value={routeConfig.estimatedTime || ''}
+                    onChange={(e) => updateRouteField('estimatedTime', e.target.value || undefined)}
+                    placeholder="6 hours"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Waypoints */}
+              <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                    Routing Waypoints
+                  </h4>
+                  <button
+                    onClick={addWaypoint}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Waypoint
+                  </button>
+                </div>
+                {(!routeConfig.waypoints || routeConfig.waypoints.length === 0) ? (
+                  <p className="text-sm text-slate-400 text-center py-4">
+                    No waypoints configured. Add waypoints to customize the route path.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {routeConfig.waypoints.map((waypoint, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <span className="w-8 h-8 bg-indigo-600/30 rounded-full flex items-center justify-center text-indigo-400 text-sm font-medium">
+                          {index + 1}
+                        </span>
+                        <div className="flex-1 grid grid-cols-2 gap-3">
+                          <input
+                            type="number"
+                            step="0.0001"
+                            value={waypoint[0] || ''}
+                            onChange={(e) => updateWaypoint(index, parseFloat(e.target.value) || 0, waypoint[1])}
+                            placeholder="Latitude"
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                          />
+                          <input
+                            type="number"
+                            step="0.0001"
+                            value={waypoint[1] || ''}
+                            onChange={(e) => updateWaypoint(index, waypoint[0], parseFloat(e.target.value) || 0)}
+                            placeholder="Longitude"
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeWaypoint(index)}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 mt-3">
+                  Waypoints shape the route between start and end points. The route will pass through each waypoint in order.
+                </p>
+              </div>
+
+              {/* Points of Interest */}
+              <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                    Points of Interest
+                  </h4>
+                  <button
+                    onClick={addPOI}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add POI
+                  </button>
+                </div>
+                {(!routeConfig.pois || routeConfig.pois.length === 0) ? (
+                  <p className="text-sm text-slate-400 text-center py-4">
+                    No points of interest configured. Add gas stations, restaurants, viewpoints, etc.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {routeConfig.pois.map((poi, index) => {
+                      const categoryConfig = POI_CATEGORIES.find(c => c.value === poi.category) || POI_CATEGORIES[2];
+                      return (
+                        <div key={poi.id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-8 h-8 ${categoryConfig.bgColor} rounded-full flex items-center justify-center`}>
+                                {poi.category === 'gas' && <Fuel className="h-4 w-4 text-white" />}
+                                {poi.category === 'restaurant' && <UtensilsCrossed className="h-4 w-4 text-white" />}
+                                {poi.category === 'poi' && <MapPin className="h-4 w-4 text-white" />}
+                                {poi.category === 'viewpoint' && <Mountain className="h-4 w-4 text-white" />}
+                                {poi.category === 'photo' && <Camera className="h-4 w-4 text-white" />}
+                                {poi.category === 'border' && <Flag className="h-4 w-4 text-white" />}
+                                {poi.category === 'emergency' && <Cross className="h-4 w-4 text-white" />}
+                              </div>
+                              <span className="text-sm font-medium text-slate-300">POI {index + 1}</span>
+                            </div>
+                            <button
+                              onClick={() => removePOI(poi.id)}
+                              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={poi.name}
+                                onChange={(e) => updatePOI(poi.id, 'name', e.target.value)}
+                                placeholder="Pemex Gas Station"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Category *
+                              </label>
+                              <select
+                                value={poi.category}
+                                onChange={(e) => updatePOI(poi.id, 'category', e.target.value)}
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-indigo-500 text-sm"
+                              >
+                                {POI_CATEGORIES.map((cat) => (
+                                  <option key={cat.value} value={cat.value}>
+                                    {cat.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Latitude *
+                              </label>
+                              <input
+                                type="number"
+                                step="0.0001"
+                                value={poi.coordinates[0] || ''}
+                                onChange={(e) => updatePOI(poi.id, 'coordinates', [parseFloat(e.target.value) || 0, poi.coordinates[1]])}
+                                placeholder="32.5432"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Longitude *
+                              </label>
+                              <input
+                                type="number"
+                                step="0.0001"
+                                value={poi.coordinates[1] || ''}
+                                onChange={(e) => updatePOI(poi.id, 'coordinates', [poi.coordinates[0], parseFloat(e.target.value) || 0])}
+                                placeholder="-116.9876"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Description
+                            </label>
+                            <textarea
+                              value={poi.description}
+                              onChange={(e) => updatePOI(poi.id, 'description', e.target.value)}
+                              placeholder="Reliable gas station with clean restrooms..."
+                              rows={2}
+                              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm resize-none"
+                            />
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Phone (optional)
+                              </label>
+                              <input
+                                type="tel"
+                                value={poi.phone || ''}
+                                onChange={(e) => updatePOI(poi.id, 'phone', e.target.value || undefined)}
+                                placeholder="+52 646 123 4567"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Hours (optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={poi.hours || ''}
+                                onChange={(e) => updatePOI(poi.id, 'hours', e.target.value || undefined)}
+                                placeholder="24 hours / 7am-10pm"
+                                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 mt-3">
+                  POIs appear as markers on the day's route map. Add gas stations, restaurants, scenic viewpoints, and other notable stops.
+                </p>
+              </div>
             </div>
           </section>
         </div>

@@ -5,6 +5,8 @@
  * user selections, charges, and payments.
  */
 
+import type { RouteConfig } from './routeConfig';
+
 // ============================================
 // NIGHTLY CONFIGURATION (Admin sets these)
 // ============================================
@@ -17,6 +19,8 @@ export interface NightConfig {
   // Hotel configuration
   hotelAvailable: boolean;
   hotelName: string;
+  hotelAddress: string;
+  hotelPhone: string;
   hotelWebsite: string;
   hotelMapsLink: string;
   hotelDescription: string;
@@ -52,6 +56,9 @@ export interface NightConfig {
 
   // Optional activities (can have multiple per night)
   optionalActivities: OptionalActivity[];
+
+  // Route configuration (admin-configurable)
+  routeConfig?: RouteConfig;
 }
 
 export interface OptionalActivity {
@@ -77,6 +84,8 @@ export const emptyNightConfig: NightConfig = {
   nightSummary: '',
   hotelAvailable: false,
   hotelName: '',
+  hotelAddress: '',
+  hotelPhone: '',
   hotelWebsite: '',
   hotelMapsLink: '',
   hotelDescription: '',
