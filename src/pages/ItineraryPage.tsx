@@ -197,7 +197,6 @@ function DayCard({ day, isExpanded, onToggle, routeConfig }: DayCardProps) {
               <DayRouteMap
                 routeConfig={routeConfig}
                 day={day.day}
-                height="300px"
               />
             </div>
           )}

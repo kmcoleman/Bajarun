@@ -16,7 +16,6 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
 interface DayRouteMapProps {
   routeConfig?: RouteConfig;
   day: number;
-  height?: string;
   showControls?: boolean;
 }
 
@@ -34,7 +33,6 @@ const POI_COLORS: Record<string, string> = {
 export default function DayRouteMap({
   routeConfig,
   day,
-  height = '400px',
   showControls = true
 }: DayRouteMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -67,7 +65,7 @@ export default function DayRouteMap({
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/outdoors-v12',
         center: defaultCenter,
-        zoom: 7,
+        zoom: 5,
       });
 
       if (showControls) {
@@ -228,7 +226,7 @@ export default function DayRouteMap({
 
       map.current!.fitBounds(bounds, {
         padding: 50,
-        maxZoom: 10
+        maxZoom: 5
       });
 
       setRouteLoading(false);
@@ -382,10 +380,7 @@ export default function DayRouteMap({
   // No token placeholder
   if (!hasToken) {
     return (
-      <div
-        className="bg-slate-800 flex items-center justify-center rounded-xl"
-        style={{ height }}
-      >
+      <div className="bg-slate-800 flex items-center justify-center rounded-xl aspect-square">
         <div className="text-center text-slate-400 p-6">
           <p className="text-sm">Map requires Mapbox API key</p>
         </div>
@@ -396,10 +391,7 @@ export default function DayRouteMap({
   // No route configured
   if (!hasRoute) {
     return (
-      <div
-        className="bg-slate-800 flex items-center justify-center rounded-xl"
-        style={{ height }}
-      >
+      <div className="bg-slate-800 flex items-center justify-center rounded-xl aspect-square">
         <div className="text-center text-slate-400 p-6">
           <p className="text-sm">No route configured for Day {day}</p>
         </div>
@@ -410,10 +402,7 @@ export default function DayRouteMap({
   // Error state
   if (mapError) {
     return (
-      <div
-        className="bg-slate-800 flex items-center justify-center rounded-xl"
-        style={{ height }}
-      >
+      <div className="bg-slate-800 flex items-center justify-center rounded-xl aspect-square">
         <div className="text-center text-red-400 p-6">
           <p className="text-sm">{mapError}</p>
         </div>
@@ -425,8 +414,7 @@ export default function DayRouteMap({
     <div className="relative">
       <div
         ref={mapContainer}
-        className="rounded-xl overflow-hidden"
-        style={{ height }}
+        className="rounded-xl overflow-hidden aspect-square"
       />
       {!mapLoaded && (
         <div
