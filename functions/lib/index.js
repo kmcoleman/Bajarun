@@ -42,7 +42,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onNewRegistration = exports.sendBulkEmail = void 0;
+exports.sendPushNotification = exports.onNewRegistration = exports.sendBulkEmail = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
@@ -410,6 +410,186 @@ exports.onNewRegistration = (0, firestore_1.onDocumentCreated)({
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         logger.error("[BajaEmail] Failed to send welcome email", { email, error: errorMessage });
+    }
+});
+/**
+ * Send push notification to all registered devices
+ * Supports both FCM (web) and Expo (native app) tokens
+ */
+exports.sendPushNotification = (0, https_1.onCall)(async (request) => {
+    var _a, _b;
+    requireAdmin(request.auth);
+    const { title, body, priority } = request.data;
+    // Validate input
+    if (!title || !body) {
+        throw new https_1.HttpsError("invalid-argument", "Title and body are required");
+    }
+    logger.info("[BajaPush] sendPushNotification called", {
+        uid: (_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid,
+        title,
+        bodyLength: (body === null || body === void 0 ? void 0 : body.length) || 0,
+        priority,
+    });
+    const db = admin.firestore();
+    const messaging = admin.messaging();
+    try {
+        // 1. Save announcement to Firestore
+        const announcementRef = await db.collection("announcements").add({
+            title,
+            body,
+            priority: priority || "normal",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: (_b = request.auth) === null || _b === void 0 ? void 0 : _b.uid,
+        });
+        logger.info("[BajaPush] Announcement saved", { id: announcementRef.id });
+        // 2. Get all tokens and separate FCM from Expo
+        const tokensSnapshot = await db.collection("fcmTokens").get();
+        const fcmTokens = [];
+        const fcmTokenDocs = [];
+        const expoTokens = [];
+        const expoTokenDocs = [];
+        tokensSnapshot.forEach((doc) => {
+            const data = doc.data();
+            const token = data.token;
+            if (token) {
+                // Expo tokens start with "ExponentPushToken["
+                if (token.startsWith("ExponentPushToken[")) {
+                    expoTokens.push(token);
+                    expoTokenDocs.push({ id: doc.id, token });
+                }
+                else {
+                    fcmTokens.push(token);
+                    fcmTokenDocs.push({ id: doc.id, token });
+                }
+            }
+        });
+        logger.info("[BajaPush] Token counts", {
+            fcm: fcmTokens.length,
+            expo: expoTokens.length,
+        });
+        let fcmSent = 0;
+        let fcmFailed = 0;
+        let expoSent = 0;
+        let expoFailed = 0;
+        // 3. Send to FCM tokens (web PWA)
+        if (fcmTokens.length > 0) {
+            const message = {
+                notification: {
+                    title,
+                    body,
+                },
+                data: {
+                    announcementId: announcementRef.id,
+                    priority,
+                },
+                tokens: fcmTokens,
+                android: {
+                    priority: priority === "high" ? "high" : "normal",
+                },
+                apns: {
+                    payload: {
+                        aps: {
+                            sound: priority === "high" ? "default" : undefined,
+                        },
+                    },
+                },
+            };
+            const response = await messaging.sendEachForMulticast(message);
+            fcmSent = response.successCount;
+            fcmFailed = response.failureCount;
+            logger.info("[BajaPush] FCM result", {
+                successCount: response.successCount,
+                failureCount: response.failureCount,
+            });
+            // Clean up invalid FCM tokens
+            const invalidTokens = [];
+            response.responses.forEach((resp, idx) => {
+                var _a, _b;
+                if (!resp.success) {
+                    const errorCode = (_a = resp.error) === null || _a === void 0 ? void 0 : _a.code;
+                    if (errorCode === "messaging/invalid-registration-token" ||
+                        errorCode === "messaging/registration-token-not-registered") {
+                        invalidTokens.push(fcmTokenDocs[idx].id);
+                    }
+                    logger.warn("[BajaPush] FCM failed", {
+                        error: (_b = resp.error) === null || _b === void 0 ? void 0 : _b.message,
+                        code: errorCode,
+                    });
+                }
+            });
+            if (invalidTokens.length > 0) {
+                const batch = db.batch();
+                invalidTokens.forEach((tokenId) => {
+                    batch.delete(db.collection("fcmTokens").doc(tokenId));
+                });
+                await batch.commit();
+                logger.info("[BajaPush] Cleaned up invalid FCM tokens", { count: invalidTokens.length });
+            }
+        }
+        // 4. Send to Expo tokens (native app)
+        if (expoTokens.length > 0) {
+            const messages = expoTokens.map((token) => ({
+                to: token,
+                sound: priority === "high" ? "default" : undefined,
+                title,
+                body,
+                badge: 1,
+                data: { announcementId: announcementRef.id, priority },
+                // iOS-specific: make notification persist in notification center
+                _contentAvailable: true,
+            }));
+            // Send to Expo Push API
+            const expoResponse = await fetch("https://exp.host/--/api/v2/push/send", {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(messages),
+            });
+            const expoResult = await expoResponse.json();
+            logger.info("[BajaPush] Expo result", { result: expoResult });
+            // Count successes/failures and clean up invalid tokens
+            const invalidExpoTokens = [];
+            if (expoResult.data && Array.isArray(expoResult.data)) {
+                expoResult.data.forEach((result, idx) => {
+                    var _a;
+                    if (result.status === "ok") {
+                        expoSent++;
+                    }
+                    else {
+                        expoFailed++;
+                        // Check for invalid token errors
+                        if (((_a = result.details) === null || _a === void 0 ? void 0 : _a.error) === "DeviceNotRegistered") {
+                            invalidExpoTokens.push(expoTokenDocs[idx].id);
+                        }
+                        logger.warn("[BajaPush] Expo failed", { error: result });
+                    }
+                });
+            }
+            if (invalidExpoTokens.length > 0) {
+                const batch = db.batch();
+                invalidExpoTokens.forEach((tokenId) => {
+                    batch.delete(db.collection("fcmTokens").doc(tokenId));
+                });
+                await batch.commit();
+                logger.info("[BajaPush] Cleaned up invalid Expo tokens", { count: invalidExpoTokens.length });
+            }
+        }
+        return {
+            sent: fcmSent + expoSent,
+            failed: fcmFailed + expoFailed,
+            announcementId: announcementRef.id,
+            details: {
+                fcm: { sent: fcmSent, failed: fcmFailed },
+                expo: { sent: expoSent, failed: expoFailed },
+            },
+        };
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("[BajaPush] sendPushNotification failed", { error: errorMessage });
+        throw new https_1.HttpsError("internal", "Failed to send push notification");
     }
 });
 //# sourceMappingURL=index.js.map

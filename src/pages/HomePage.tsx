@@ -165,6 +165,41 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen -mt-16">
+      {/* Registration Deadline Watermark */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: '120px',
+            right: '-60px',
+            background: 'rgba(220, 38, 38, 0.65)',
+            color: 'white',
+            padding: '18px 120px 18px 240px',
+            fontWeight: 700,
+            fontSize: '24px',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            transform: 'rotate(45deg)',
+            boxShadow: '0 6px 30px rgba(0,0,0,0.3)',
+            textAlign: 'center',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Registration Closing Dec 24
+        </div>
+      </div>
+
       {/* CSS for animations */}
       <style>{`
         @keyframes float {

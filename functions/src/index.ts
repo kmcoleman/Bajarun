@@ -415,3 +415,207 @@ export const onNewRegistration = onDocumentCreated(
     }
   }
 );
+
+/**
+ * Send push notification to all registered devices
+ * Supports both FCM (web) and Expo (native app) tokens
+ */
+export const sendPushNotification = onCall(
+  async (request) => {
+    requireAdmin(request.auth);
+
+    const {title, body, priority} = request.data as {
+      title: string;
+      body: string;
+      priority: "high" | "normal";
+    };
+
+    // Validate input
+    if (!title || !body) {
+      throw new HttpsError("invalid-argument", "Title and body are required");
+    }
+
+    logger.info("[BajaPush] sendPushNotification called", {
+      uid: request.auth?.uid,
+      title,
+      bodyLength: body?.length || 0,
+      priority,
+    });
+
+    const db = admin.firestore();
+    const messaging = admin.messaging();
+
+    try {
+      // 1. Save announcement to Firestore
+      const announcementRef = await db.collection("announcements").add({
+        title,
+        body,
+        priority: priority || "normal",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: request.auth?.uid,
+      });
+
+      logger.info("[BajaPush] Announcement saved", {id: announcementRef.id});
+
+      // 2. Get all tokens and separate FCM from Expo
+      const tokensSnapshot = await db.collection("fcmTokens").get();
+      const fcmTokens: string[] = [];
+      const fcmTokenDocs: {id: string; token: string}[] = [];
+      const expoTokens: string[] = [];
+      const expoTokenDocs: {id: string; token: string}[] = [];
+
+      tokensSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const token = data.token;
+        if (token) {
+          // Expo tokens start with "ExponentPushToken["
+          if (token.startsWith("ExponentPushToken[")) {
+            expoTokens.push(token);
+            expoTokenDocs.push({id: doc.id, token});
+          } else {
+            fcmTokens.push(token);
+            fcmTokenDocs.push({id: doc.id, token});
+          }
+        }
+      });
+
+      logger.info("[BajaPush] Token counts", {
+        fcm: fcmTokens.length,
+        expo: expoTokens.length,
+      });
+
+      let fcmSent = 0;
+      let fcmFailed = 0;
+      let expoSent = 0;
+      let expoFailed = 0;
+
+      // 3. Send to FCM tokens (web PWA)
+      if (fcmTokens.length > 0) {
+        const message = {
+          notification: {
+            title,
+            body,
+          },
+          data: {
+            announcementId: announcementRef.id,
+            priority,
+          },
+          tokens: fcmTokens,
+          android: {
+            priority: priority === "high" ? "high" as const : "normal" as const,
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: priority === "high" ? "default" : undefined,
+              },
+            },
+          },
+        };
+
+        const response = await messaging.sendEachForMulticast(message);
+        fcmSent = response.successCount;
+        fcmFailed = response.failureCount;
+
+        logger.info("[BajaPush] FCM result", {
+          successCount: response.successCount,
+          failureCount: response.failureCount,
+        });
+
+        // Clean up invalid FCM tokens
+        const invalidTokens: string[] = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            const errorCode = resp.error?.code;
+            if (
+              errorCode === "messaging/invalid-registration-token" ||
+              errorCode === "messaging/registration-token-not-registered"
+            ) {
+              invalidTokens.push(fcmTokenDocs[idx].id);
+            }
+            logger.warn("[BajaPush] FCM failed", {
+              error: resp.error?.message,
+              code: errorCode,
+            });
+          }
+        });
+
+        if (invalidTokens.length > 0) {
+          const batch = db.batch();
+          invalidTokens.forEach((tokenId) => {
+            batch.delete(db.collection("fcmTokens").doc(tokenId));
+          });
+          await batch.commit();
+          logger.info("[BajaPush] Cleaned up invalid FCM tokens", {count: invalidTokens.length});
+        }
+      }
+
+      // 4. Send to Expo tokens (native app)
+      if (expoTokens.length > 0) {
+        const messages = expoTokens.map((token) => ({
+          to: token,
+          sound: priority === "high" ? "default" : undefined,
+          title,
+          body,
+          badge: 1,
+          data: {announcementId: announcementRef.id, priority},
+          // iOS-specific: make notification persist in notification center
+          _contentAvailable: true,
+        }));
+
+        // Send to Expo Push API
+        const expoResponse = await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(messages),
+        });
+
+        const expoResult = await expoResponse.json();
+        logger.info("[BajaPush] Expo result", {result: expoResult});
+
+        // Count successes/failures and clean up invalid tokens
+        const invalidExpoTokens: string[] = [];
+        if (expoResult.data && Array.isArray(expoResult.data)) {
+          expoResult.data.forEach((result: {status: string; details?: {error?: string}}, idx: number) => {
+            if (result.status === "ok") {
+              expoSent++;
+            } else {
+              expoFailed++;
+              // Check for invalid token errors
+              if (result.details?.error === "DeviceNotRegistered") {
+                invalidExpoTokens.push(expoTokenDocs[idx].id);
+              }
+              logger.warn("[BajaPush] Expo failed", {error: result});
+            }
+          });
+        }
+
+        if (invalidExpoTokens.length > 0) {
+          const batch = db.batch();
+          invalidExpoTokens.forEach((tokenId) => {
+            batch.delete(db.collection("fcmTokens").doc(tokenId));
+          });
+          await batch.commit();
+          logger.info("[BajaPush] Cleaned up invalid Expo tokens", {count: invalidExpoTokens.length});
+        }
+      }
+
+      return {
+        sent: fcmSent + expoSent,
+        failed: fcmFailed + expoFailed,
+        announcementId: announcementRef.id,
+        details: {
+          fcm: {sent: fcmSent, failed: fcmFailed},
+          expo: {sent: expoSent, failed: expoFailed},
+        },
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[BajaPush] sendPushNotification failed", {error: errorMessage});
+      throw new HttpsError("internal", "Failed to send push notification");
+    }
+  }
+);
