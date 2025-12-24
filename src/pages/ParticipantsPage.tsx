@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Bike, MapPin, LogIn, Loader2, Phone, Mail, MessageCircle, Map as MapIcon } from 'lucide-react';
+import { User, Bike, MapPin, LogIn, Loader2, Phone, Mail, MessageCircle, Map as MapIcon, BarChart3, Users, Wrench, Languages, Mountain, Hotel, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -54,6 +54,16 @@ interface Participant {
   // Stored coordinates (geocoded from zip code)
   latitude?: number;
   longitude?: number;
+  // Demographics fields
+  yearsRiding?: string;
+  offRoadExperience?: string;
+  repairExperience?: string;
+  spanishLevel?: string;
+  bajaTourExperience?: string;
+  accommodationPreference?: string;
+  hasGarminInreach?: boolean;
+  hasToolkit?: boolean;
+  hasPillion?: boolean;
 }
 
 // Format phone number to (xxx) xxx-xxxx
@@ -160,7 +170,7 @@ export default function ParticipantsPage() {
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">Participants</h1>
           <p className="text-slate-400">
             Meet your fellow riders for the Baja Tour 2026
@@ -171,9 +181,36 @@ export default function ParticipantsPage() {
           </div>
         </div>
 
+        {/* Navigation Buttons */}
+        {!loading && participants.length > 0 && (
+          <div className="flex justify-center gap-4 mb-12">
+            <a
+              href="#map"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-white font-medium rounded-lg transition-all"
+            >
+              <MapIcon className="h-4 w-4 text-green-400" />
+              Map
+            </a>
+            <a
+              href="#roster"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-white font-medium rounded-lg transition-all"
+            >
+              <Users className="h-4 w-4 text-blue-400" />
+              Roster
+            </a>
+            <a
+              href="#demographics"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-white font-medium rounded-lg transition-all"
+            >
+              <BarChart3 className="h-4 w-4 text-purple-400" />
+              Demographics
+            </a>
+          </div>
+        )}
+
         {/* Map Section */}
         {!loading && participants.length > 0 && (
-          <div className="mb-12">
+          <div id="map" className="mb-12 scroll-mt-24">
             {/* Map Toggle */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -271,7 +308,7 @@ export default function ParticipantsPage() {
 
         {/* Participants List */}
         {!loading && participants.length > 0 && (
-          <>
+          <div id="roster" className="scroll-mt-24">
             {/* Organizers */}
             {organizers.length > 0 && (
               <div className="mb-12">
@@ -303,7 +340,92 @@ export default function ParticipantsPage() {
                 ))}
               </div>
             </div>
-          </>
+          </div>
+        )}
+
+        {/* Demographics Section */}
+        {!loading && participants.length > 0 && (
+          <div id="demographics" className="mt-16 scroll-mt-24">
+            <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
+              <span className="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-purple-400" />
+              </span>
+              Tour Demographics
+            </h2>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Years Riding */}
+              <DemographicCard
+                title="Years Riding"
+                icon={<Calendar className="h-4 w-4 text-blue-400" />}
+                data={calculateDemographic(participants, 'yearsRiding', {
+                  less1: 'Less than 1 year',
+                  '1to5': '1-5 years',
+                  '5to10': '5-10 years',
+                  '10plus': '10+ years'
+                })}
+              />
+
+              {/* Off-Road Experience */}
+              <DemographicCard
+                title="Off-Road Experience"
+                icon={<Mountain className="h-4 w-4 text-green-400" />}
+                data={calculateDemographic(participants, 'offRoadExperience', {
+                  none: 'No experience',
+                  beginner: 'Beginner',
+                  intermediate: 'Intermediate',
+                  advanced: 'Advanced'
+                })}
+              />
+
+              {/* Repair Experience */}
+              <DemographicCard
+                title="Repair Experience"
+                icon={<Wrench className="h-4 w-4 text-orange-400" />}
+                data={calculateDemographic(participants, 'repairExperience', {
+                  none: 'None (dealer)',
+                  basic: 'Basic (patch tire)',
+                  comfortable: 'Comfortable',
+                  macgyver: 'MacGyver level'
+                })}
+              />
+
+              {/* Spanish Level */}
+              <DemographicCard
+                title="Spanish Level"
+                icon={<Languages className="h-4 w-4 text-red-400" />}
+                data={calculateDemographic(participants, 'spanishLevel', {
+                  gringo: 'Gringo (none)',
+                  read: 'Can read a bit',
+                  simple: 'Simple conversations',
+                  fluent: 'Fluent'
+                })}
+              />
+
+              {/* Baja Experience */}
+              <DemographicCard
+                title="Baja Tour Experience"
+                icon={<MapIcon className="h-4 w-4 text-cyan-400" />}
+                data={calculateDemographic(participants, 'bajaTourExperience', {
+                  no: 'First time',
+                  once: 'Once before',
+                  twice: 'Twice before',
+                  many: 'Many times'
+                })}
+              />
+
+              {/* Accommodation */}
+              <DemographicCard
+                title="Accommodation Preference"
+                icon={<Hotel className="h-4 w-4 text-purple-400" />}
+                data={calculateDemographic(participants, 'accommodationPreference', {
+                  camping: 'Prefer Camping',
+                  hotels: 'Prefer Hotels',
+                  either: 'Either is fine'
+                })}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -440,6 +562,74 @@ function ParticipantCard({ person, featured }: ParticipantCardProps) {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper function to calculate demographic data
+function calculateDemographic(
+  participants: Participant[],
+  field: keyof Participant,
+  labels: Record<string, string>
+): { label: string; value: number; percentage: number }[] {
+  const counts: Record<string, number> = {};
+
+  // Initialize all keys with 0
+  Object.keys(labels).forEach(key => {
+    counts[key] = 0;
+  });
+
+  // Count values
+  participants.forEach(p => {
+    const value = p[field] as string;
+    if (value && counts.hasOwnProperty(value)) {
+      counts[value]++;
+    }
+  });
+
+  const total = participants.length;
+
+  return Object.entries(labels).map(([key, label]) => ({
+    label,
+    value: counts[key] || 0,
+    percentage: total > 0 ? Math.round((counts[key] || 0) / total * 100) : 0
+  }));
+}
+
+// Demographic card component with bar chart
+interface DemographicCardProps {
+  title: string;
+  icon: React.ReactNode;
+  data: { label: string; value: number; percentage: number }[];
+}
+
+function DemographicCard({ title, icon, data }: DemographicCardProps) {
+  const colors = ['bg-blue-500', 'bg-amber-500', 'bg-green-500', 'bg-purple-500'];
+
+  return (
+    <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        {icon}
+        {title}
+      </h3>
+      <div className="space-y-3">
+        {data.map((item, index) => (
+          <div key={item.label}>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-slate-300">{item.label}</span>
+              <span className="text-white font-medium">
+                {item.value} <span className="text-slate-500">({item.percentage}%)</span>
+              </span>
+            </div>
+            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className={`${colors[index % colors.length]} h-full rounded-full transition-all`}
+                style={{ width: `${item.percentage}%` }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
