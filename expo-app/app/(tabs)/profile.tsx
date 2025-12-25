@@ -3,10 +3,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator, Switch } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineData } from '../../hooks/useOfflineData';
 import { openDocument, cacheAllDocuments, getDocumentCacheStatus } from '../../lib/documents';
+import { useTheme } from '../../context/ThemeContext';
 
 // All document types
 const DOCUMENT_CONFIG = {
@@ -25,6 +27,7 @@ export default function ProfilePage() {
   const { userProfile, riderDocuments, loading } = useOfflineData(user?.uid || null);
   const [cacheStatus, setCacheStatus] = useState<Record<string, boolean>>({});
   const [downloading, setDownloading] = useState<string | null>(null);
+  const { theme, isDark, themePreference, setThemePreference } = useTheme();
 
   // Cache documents and track status
   useEffect(() => {
@@ -248,6 +251,45 @@ export default function ProfilePage() {
             <Text className="text-gray-400 text-xs text-center mt-3">
               Upload documents on the website
             </Text>
+          </View>
+        </View>
+
+        {/* Settings Section */}
+        <View className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
+          <View className="bg-gray-600 px-4 py-2">
+            <Text className="text-white text-sm font-medium">⚙️ Settings</Text>
+          </View>
+          <View className="p-4">
+            {/* Theme Toggle */}
+            <View className="flex-row justify-between items-center py-3 border-b border-gray-100">
+              <View className="flex-row items-center">
+                <FontAwesome
+                  name={isDark ? "moon-o" : "sun-o"}
+                  size={18}
+                  color={isDark ? "#6366f1" : "#f59e0b"}
+                />
+                <Text className="text-gray-900 ml-3">Dark Mode</Text>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={() => setThemePreference(isDark ? 'light' : 'dark')}
+                trackColor={{ false: '#e2e8f0', true: '#6366f1' }}
+                thumbColor={'#ffffff'}
+              />
+            </View>
+            {/* System Theme Option */}
+            <TouchableOpacity
+              onPress={() => setThemePreference('system')}
+              className="flex-row justify-between items-center py-3"
+            >
+              <View className="flex-row items-center">
+                <FontAwesome name="mobile" size={18} color="#64748b" />
+                <Text className="text-gray-900 ml-3">Use System Theme</Text>
+              </View>
+              {themePreference === 'system' && (
+                <FontAwesome name="check" size={16} color="#22c55e" />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
