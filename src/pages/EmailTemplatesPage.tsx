@@ -6,7 +6,6 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Mail,
   Plus,
@@ -19,11 +18,11 @@ import {
   CheckCircle,
   Code,
   FileText,
-  ArrowLeft,
   Copy,
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import AdminLayout from '../components/AdminLayout';
 import { db } from '../lib/firebase';
 import {
   collection,
@@ -266,7 +265,6 @@ const DEFAULT_TEMPLATES: Omit<EmailTemplate, 'lastUpdated' | 'updatedBy'>[] = [
 
 export default function EmailTemplatesPage() {
   const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
@@ -276,13 +274,6 @@ export default function EmailTemplatesPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [newTemplateId, setNewTemplateId] = useState('');
-
-  // Check admin access
-  useEffect(() => {
-    if (!authLoading && (!user || user.uid !== ADMIN_UID)) {
-      navigate('/');
-    }
-  }, [user, authLoading, navigate]);
 
   // Load templates
   useEffect(() => {
@@ -536,40 +527,22 @@ export default function EmailTemplatesPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
-      </div>
+      <AdminLayout title="Email Templates">
+        <div className="flex items-center justify-center min-h-[40vh]">
+          <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+        </div>
+      </AdminLayout>
     );
   }
 
-  if (!user || user.uid !== ADMIN_UID) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-slate-900 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/admin')}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <Mail className="h-7 w-7 text-blue-400" />
-                Email Templates
-              </h1>
-              <p className="text-slate-400 text-sm mt-1">
-                Manage email templates with Handlebars syntax
-              </p>
-            </div>
-          </div>
-
-          {templates.length === 0 && (
+    <AdminLayout title="Email Templates">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <p className="text-slate-400 text-sm">
+          Manage email templates with Handlebars syntax
+        </p>
+        {templates.length === 0 && (
             <button
               onClick={seedDefaultTemplates}
               disabled={saving}
@@ -875,7 +848,6 @@ export default function EmailTemplatesPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </AdminLayout>
   );
 }

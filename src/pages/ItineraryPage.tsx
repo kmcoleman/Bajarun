@@ -2,75 +2,70 @@
  * ItineraryPage.tsx
  *
  * Shows the complete trip itinerary with:
- * - Route map (placeholder for now)
- * - Day-by-day tiles with details
- * - Miles, time, accommodations, points of interest
+ * - Day tabs across the top for quick navigation
+ * - Selected day's details shown below
+ * - Route map, miles, time, accommodations, points of interest
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   MapPin,
   Clock,
   Milestone,
   Hotel,
-  ChevronDown,
-  ChevronUp,
   Star,
   Calendar,
   Tent,
   ExternalLink,
   Info,
-  Map
+  Map,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { itineraryData, tripSummary, totalMiles, type DayItinerary } from '../data/itinerary';
 import RouteMap from '../components/RouteMap';
-import DayRouteMap from '../components/DayRouteMap';
-import { db } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import type { NightConfig } from '../types/eventConfig';
 
 export default function ItineraryPage() {
-  const [expandedDay, setExpandedDay] = useState<number | null>(1);
-  const [nightConfigs, setNightConfigs] = useState<{ [key: string]: NightConfig }>({});
+  const [selectedDay, setSelectedDay] = useState<number>(1);
+  const tabsRef = useRef<HTMLDivElement>(null);
 
-  // Fetch route configs from Firestore
+  // Navigate to previous/next day
+  const goToPrevDay = () => {
+    if (selectedDay > 1) {
+      setSelectedDay(selectedDay - 1);
+    }
+  };
+
+  const goToNextDay = () => {
+    if (selectedDay < itineraryData.length) {
+      setSelectedDay(selectedDay + 1);
+    }
+  };
+
+  // Scroll tabs to show selected day
   useEffect(() => {
-    async function loadConfigs() {
-      try {
-        const docRef = doc(db, 'eventConfig', 'pricing');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().nights) {
-          setNightConfigs(docSnap.data().nights);
-        }
-      } catch (error) {
-        console.error('Error loading route configs:', error);
+    if (tabsRef.current) {
+      const selectedTab = tabsRef.current.querySelector(`[data-day="${selectedDay}"]`);
+      if (selectedTab) {
+        selectedTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
     }
-    loadConfigs();
-  }, []);
+  }, [selectedDay]);
 
-  const toggleDay = (day: number) => {
-    setExpandedDay(expandedDay === day ? null : day);
-  };
-
-  // Get route config for a specific day
-  const getRouteConfig = (dayNumber: number) => {
-    const nightKey = `night-${dayNumber}`;
-    return nightConfigs[nightKey]?.routeConfig;
-  };
+  const currentDay = itineraryData.find(d => d.day === selectedDay) || itineraryData[0];
 
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">Trip Itinerary</h1>
           <p className="text-slate-400 max-w-2xl mx-auto">
             {tripSummary.totalDays} days of adventure from {tripSummary.startLocation} to {tripSummary.endLocation}
           </p>
 
           {/* Trip Stats */}
-          <div className="flex flex-wrap justify-center gap-6 mt-8">
+          <div className="flex flex-wrap justify-center gap-6 mt-6">
             <div className="flex items-center gap-2 text-slate-300">
               <Calendar className="h-5 w-5 text-blue-400" />
               <span>{tripSummary.startDate} - {tripSummary.endDate}</span>
@@ -86,228 +81,243 @@ export default function ItineraryPage() {
           </div>
 
           {/* Draft Notice */}
-          <div className="mt-8 max-w-2xl mx-auto p-4 bg-amber-600/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+          <div className="mt-6 max-w-2xl mx-auto p-4 bg-amber-600/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
             <Info className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <p className="text-amber-200/80 text-sm text-left">
               <strong className="text-amber-300">Draft Itinerary:</strong> This itinerary is subject to change.
               The route will be fine-tuned to focus on the best roads we can find.
-              Use this itinerary to understand the distances to be expected and where we will be each day.
             </p>
           </div>
         </div>
 
-        {/* Interactive Route Map */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700 mb-12 overflow-hidden">
-          <RouteMap
-            onDayClick={(day) => setExpandedDay(day)}
-            selectedDay={expandedDay}
-          />
+        {/* Day Tabs */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 p-2 mb-6">
+          <div className="flex items-center gap-2">
+            {/* Previous Button */}
+            <button
+              onClick={goToPrevDay}
+              disabled={selectedDay === 1}
+              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              <ChevronLeft className="h-5 w-5 text-white" />
+            </button>
+
+            {/* Scrollable Tabs */}
+            <div
+              ref={tabsRef}
+              className="flex-1 flex gap-2 overflow-x-auto scrollbar-hide py-1"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {itineraryData.map((day) => {
+                const isSelected = selectedDay === day.day;
+                const isRestDay = day.miles === 0;
+
+                return (
+                  <button
+                    key={day.day}
+                    data-day={day.day}
+                    onClick={() => setSelectedDay(day.day)}
+                    className={`flex-shrink-0 px-4 py-3 rounded-lg font-medium transition-all ${
+                      isSelected
+                        ? isRestDay
+                          ? 'bg-green-600 text-white'
+                          : 'bg-blue-600 text-white'
+                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className="text-lg font-bold">Day {day.day}</div>
+                      <div className="text-xs opacity-80 whitespace-nowrap">
+                        {day.miles > 0 ? `${day.miles} mi` : 'Rest'}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={goToNextDay}
+              disabled={selectedDay === itineraryData.length}
+              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              <ChevronRight className="h-5 w-5 text-white" />
+            </button>
+          </div>
         </div>
 
-        {/* Day-by-Day Itinerary */}
-        <div className="space-y-4">
-          {itineraryData.map((day) => (
-            <DayCard
-              key={day.day}
-              day={day}
-              isExpanded={expandedDay === day.day}
-              onToggle={() => toggleDay(day.day)}
-              routeConfig={getRouteConfig(day.day)}
-            />
-          ))}
-        </div>
+        {/* Selected Day Content */}
+        <DayContent day={currentDay} onDayClick={setSelectedDay} />
       </div>
     </div>
   );
 }
 
-interface DayCardProps {
+interface DayContentProps {
   day: DayItinerary;
-  isExpanded: boolean;
-  onToggle: () => void;
-  routeConfig?: import('../types/routeConfig').RouteConfig;
+  onDayClick: (day: number) => void;
 }
 
-function DayCard({ day, isExpanded, onToggle, routeConfig }: DayCardProps) {
+function DayContent({ day, onDayClick }: DayContentProps) {
   const isRestDay = day.miles === 0;
-  const hasRouteMap = routeConfig?.startCoordinates?.lat && routeConfig?.endCoordinates?.lat;
 
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-      {/* Header - Always visible */}
-      <button
-        onClick={onToggle}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-700/50 transition-colors"
-      >
-        <div className="flex items-center gap-4">
+    <div className="space-y-6">
+      {/* Day Header Card */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+        <div className="flex items-start gap-4">
           {/* Day number badge */}
-          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+          <div className={`w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0 ${
             isRestDay ? 'bg-green-600/20' : 'bg-blue-600/20'
           }`}>
-            <span className={`text-lg font-bold ${
+            <span className={`text-2xl font-bold ${
               isRestDay ? 'text-green-400' : 'text-blue-400'
             }`}>
               {day.day}
             </span>
           </div>
 
-          {/* Title and date */}
-          <div className="text-left">
-            <h3 className="text-lg font-semibold text-white">{day.title}</h3>
-            <div className="flex items-center gap-4 text-sm text-slate-400">
-              <span>{day.date}</span>
-              {!isRestDay && (
-                <>
-                  <span>•</span>
-                  <span>{day.miles} miles</span>
-                </>
+          {/* Title and info */}
+          <div className="flex-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-2xl font-bold text-white">{day.title}</h2>
+              {isRestDay && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-600/20 text-green-400 rounded-full text-sm">
+                  <Star className="h-4 w-4" />
+                  Rest Day
+                </span>
               )}
             </div>
+            <p className="text-slate-400 mt-1">{day.date}</p>
+            <p className="text-slate-300 mt-3">{day.description}</p>
           </div>
         </div>
+      </div>
 
-        {/* Expand/Collapse icon */}
-        <div className="flex items-center gap-4">
-          {hasRouteMap && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-3 py-1 bg-indigo-600/20 text-indigo-400 rounded-full text-sm">
-              <Map className="h-4 w-4" />
+      {/* Route Map - Side by Side with Route Info */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Left - Route Map (taller, focuses on selected day) */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+          <div className="p-4 border-b border-slate-700">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Map className="h-5 w-5 text-blue-400" />
               Route Map
-            </span>
-          )}
-          {isRestDay && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-3 py-1 bg-green-600/20 text-green-400 rounded-full text-sm">
-              <Star className="h-4 w-4" />
-              Rest Day
-            </span>
-          )}
-          {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-slate-400" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-slate-400" />
-          )}
+            </h3>
+          </div>
+          <div className="h-[400px]">
+            <RouteMap onDayClick={onDayClick} selectedDay={day.day} />
+          </div>
         </div>
-      </button>
 
-      {/* Expanded Content */}
-      {isExpanded && (
-        <div className="px-6 pb-6 border-t border-slate-700">
-          {/* Day Route Map */}
-          {hasRouteMap && (
-            <div className="pt-6">
-              <DayRouteMap
-                routeConfig={routeConfig}
-                day={day.day}
-              />
-            </div>
-          )}
-
-          <div className={`${hasRouteMap ? 'pt-4' : 'pt-6'} grid md:grid-cols-2 gap-6`}>
-            {/* Left Column - Description */}
-            <div>
-              <p className="text-slate-300 mb-6">{day.description}</p>
-
-              {/* Route Info */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-green-400 mt-0.5" />
-                  <div>
-                    <div className="text-sm text-slate-400">From</div>
-                    <div className="text-white">{day.startPoint}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-red-400 mt-0.5" />
-                  <div>
-                    <div className="text-sm text-slate-400">To</div>
-                    <div className="text-white">{day.endPoint}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column - Stats & Details */}
+        {/* Right - Route Details */}
+        <div className="space-y-4">
+          {/* From/To */}
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <h3 className="text-lg font-semibold text-white mb-4">Route</h3>
             <div className="space-y-4">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-900 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                    <Milestone className="h-4 w-4" />
-                    Distance
-                  </div>
-                  <div className="text-xl font-semibold text-white">
-                    {day.miles > 0 ? `${day.miles} mi` : 'Rest'}
-                  </div>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-green-600/20 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="h-4 w-4 text-green-400" />
                 </div>
-
-                <div className="bg-slate-900 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                    <Clock className="h-4 w-4" />
-                    Riding Time
-                  </div>
-                  <div className="text-xl font-semibold text-white">{day.ridingTime}</div>
+                <div>
+                  <div className="text-sm text-slate-400">From</div>
+                  <div className="text-white font-medium">{day.startPoint}</div>
                 </div>
               </div>
 
-              {/* Accommodation */}
-              <div className="bg-slate-900 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                  {day.accommodationType === 'camping' ? (
-                    <Tent className="h-4 w-4" />
-                  ) : day.accommodationType === 'mixed' ? (
-                    <div className="flex items-center gap-1">
-                      <Hotel className="h-4 w-4" />
-                      <span>/</span>
-                      <Tent className="h-4 w-4" />
-                    </div>
-                  ) : (
-                    <Hotel className="h-4 w-4" />
-                  )}
-                  Accommodation
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-red-600/20 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="h-4 w-4 text-red-400" />
                 </div>
-                <div className="text-white">{day.accommodation}</div>
-                {day.accommodationLinks && day.accommodationLinks.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-slate-700 space-y-2">
-                    {day.accommodationLinks.map((link, index) => (
-                      <a
-                        key={index}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors"
-                      >
-                        {link.type === 'camping' ? (
-                          <Tent className="h-4 w-4" />
-                        ) : (
-                          <Hotel className="h-4 w-4" />
-                        )}
-                        <span>{link.name}</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Points of Interest */}
-              <div className="bg-slate-900 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-slate-400 text-sm mb-3">
-                  <Star className="h-4 w-4" />
-                  Points of Interest
+                <div>
+                  <div className="text-sm text-slate-400">To</div>
+                  <div className="text-white font-medium">{day.endPoint}</div>
                 </div>
-                <ul className="space-y-2">
-                  {day.pointsOfInterest.map((poi, index) => (
-                    <li key={index} className="flex items-start gap-2 text-slate-300">
-                      <span className="text-blue-400 mt-1">•</span>
-                      <span>{poi}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </div>
           </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+              <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
+                <Milestone className="h-4 w-4" />
+                Distance
+              </div>
+              <div className="text-xl font-bold text-white">
+                {day.miles > 0 ? `${day.miles} mi` : 'Rest'}
+              </div>
+            </div>
+
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+              <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
+                <Clock className="h-4 w-4" />
+                Riding Time
+              </div>
+              <div className="text-xl font-bold text-white">{day.ridingTime}</div>
+            </div>
+          </div>
+
+          {/* Accommodation */}
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
+            <div className="flex items-center gap-2 text-slate-400 text-sm mb-3">
+              {day.accommodationType === 'camping' ? (
+                <Tent className="h-5 w-5" />
+              ) : day.accommodationType === 'mixed' ? (
+                <div className="flex items-center gap-1">
+                  <Hotel className="h-5 w-5" />
+                  <span>/</span>
+                  <Tent className="h-5 w-5" />
+                </div>
+              ) : (
+                <Hotel className="h-5 w-5" />
+              )}
+              <span className="font-semibold text-white text-base">Accommodation</span>
+            </div>
+            <div className="text-white">{day.accommodation}</div>
+            {day.accommodationLinks && day.accommodationLinks.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-700 space-y-2">
+                {day.accommodationLinks.map((link, index) => (
+                  <a
+                    key={index}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-sm"
+                  >
+                    {link.type === 'camping' ? (
+                      <Tent className="h-4 w-4" />
+                    ) : (
+                      <Hotel className="h-4 w-4" />
+                    )}
+                    <span>{link.name}</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* Points of Interest */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+        <div className="flex items-center gap-2 text-slate-400 text-sm mb-4">
+          <Star className="h-5 w-5 text-amber-400" />
+          <span className="font-semibold text-white text-lg">Points of Interest</span>
+        </div>
+        <ul className="grid sm:grid-cols-2 gap-3">
+          {day.pointsOfInterest.map((poi, index) => (
+            <li key={index} className="flex items-start gap-3 text-slate-300">
+              <span className="w-6 h-6 rounded-full bg-amber-600/20 flex items-center justify-center flex-shrink-0 text-amber-400 text-sm font-medium">
+                {index + 1}
+              </span>
+              <span>{poi}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

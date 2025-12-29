@@ -24,6 +24,19 @@ import MyLedgerPage from './pages/MyLedgerPage';
 import MyProfilePage from './pages/MyProfilePage';
 import UserGuidePage from './pages/UserGuidePage';
 import EmailTemplatesPage from './pages/EmailTemplatesPage';
+import RoomAssignmentsPage from './pages/RoomAssignmentsPage';
+import RoomSelectionsPage from './pages/RoomSelectionsPage';
+import AdminRegistrationsPage from './pages/AdminRegistrationsPage';
+import AdminRiderPreferencesPage from './pages/AdminRiderPreferencesPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import ToursPage from './pages/ToursPage';
+import WaitlistPage from './pages/WaitlistPage';
+import SupportPage from './pages/SupportPage';
+import TermsAgreementPage from './pages/TermsAgreementPage';
+import TourUpdateEmailPage from './pages/TourUpdateEmailPage';
+import RegistrationCleanupPage from './pages/RegistrationCleanupPage';
+import DataIntegrityPage from './pages/DataIntegrityPage';
 
 function App() {
   return (
@@ -32,21 +45,34 @@ function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/tours" element={<ToursPage />} />
             <Route path="/itinerary" element={<ItineraryPage />} />
             <Route path="/discussion" element={<DiscussionPage />} />
             <Route path="/participants" element={<ParticipantsPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/waitlist" element={<WaitlistPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/nightly-config" element={<NightlyConfigPage />} />
             <Route path="/admin/email-templates" element={<EmailTemplatesPage />} />
+            <Route path="/admin/room-assignments" element={<RoomAssignmentsPage />} />
+            <Route path="/admin/room-selections" element={<RoomSelectionsPage />} />
+            <Route path="/admin/registrations" element={<AdminRegistrationsPage />} />
+            <Route path="/admin/rider-preferences" element={<AdminRiderPreferencesPage />} />
+            <Route path="/admin/tour-update-email" element={<TourUpdateEmailPage />} />
+            <Route path="/admin/registration-cleanup" element={<RegistrationCleanupPage />} />
+            <Route path="/admin/data-integrity" element={<DataIntegrityPage />} />
             <Route path="/my-selections" element={<AccommodationSelectPage />} />
             <Route path="/my-documents" element={<RiderDocumentsPage />} />
             <Route path="/my-ledger" element={<MyLedgerPage />} />
             <Route path="/my-profile" element={<MyProfilePage />} />
             <Route path="/guide" element={<UserGuidePage />} />
             <Route path="/logistics" element={<TourLogisticsPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/support" element={<SupportPage />} />
+            <Route path="/agree" element={<TermsAgreementPage />} />
           </Routes>
         </Layout>
       </BrowserRouter>

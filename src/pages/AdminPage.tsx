@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { db, functions } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, addDoc, serverTimestamp, orderBy, query, deleteDoc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, setDoc, serverTimestamp, orderBy, query, deleteDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import {
   Users,
@@ -47,7 +47,14 @@ import {
   Plus,
   CreditCard,
   Banknote,
-  FileText
+  FileText,
+  Menu,
+  Home,
+  Wrench,
+  Calendar,
+  UserCog,
+  ClipboardList,
+  Upload
 } from 'lucide-react';
 import type { NightConfig, UserSelections, OptionalActivity, PaymentMethod } from '../types/eventConfig';
 import { TRIP_NIGHTS } from '../types/eventConfig';
@@ -113,8 +120,10 @@ export default function AdminPage() {
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [savingDeposit, setSavingDeposit] = useState(false);
 
-  // Email state
-  const [activeTab, setActiveTab] = useState<'registrations' | 'email' | 'announcements' | 'emailList' | 'accommodations' | 'ledger' | 'roster' | 'profileViewer'>('registrations');
+  // Navigation state
+  const [activeTab, setActiveTab] = useState<'registrations' | 'email' | 'announcements' | 'emailList' | 'accommodations' | 'ledger' | 'roster' | 'profileViewer' | 'waitlist' | 'jsonUpload'>('registrations');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['registration', 'accommodations', 'communication', 'financial', 'tools']));
 
   // Profile viewer state
   const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null);
@@ -152,6 +161,7 @@ export default function AdminPage() {
   interface UserAccommodationData {
     odUserId: string;
     odName: string;
+    odEmail: string | null;
     odHeadshotUrl: string | null;
     selections: UserSelections;
     preferredRoommate: string | null;
@@ -191,6 +201,36 @@ export default function AdminPage() {
   // Geocoding state
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
+
+  // Waitlist state
+  interface WaitlistEntry {
+    id: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    city: string;
+    state: string;
+    bikeModel: string;
+    bikeYear: string;
+    hasPillion: boolean;
+    flexibleAccommodations: boolean;
+    heardAbout: string;
+    notes: string;
+    status: 'pending' | 'contacted' | 'promoted' | 'declined';
+    createdAt: any;
+    eventId?: string;
+    eventName?: string;
+    listType?: 'waitlist' | 'interest';
+  }
+  const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
+  const [loadingWaitlist, setLoadingWaitlist] = useState(false);
+
+  // JSON Upload state
+  const [jsonCollection, setJsonCollection] = useState('tours');
+  const [jsonDocId, setJsonDocId] = useState('');
+  const [jsonData, setJsonData] = useState('');
+  const [uploadingJson, setUploadingJson] = useState(false);
+  const [jsonResult, setJsonResult] = useState<string | null>(null);
 
   // All riders ledger totals
   const [allRidersTotals, setAllRidersTotals] = useState<{
@@ -269,6 +309,32 @@ export default function AdminPage() {
     return () => unsubscribe();
   }, [isAdmin]);
 
+  // Fetch waitlist entries when tab is selected
+  useEffect(() => {
+    async function fetchWaitlist() {
+      if (!isAdmin || activeTab !== 'waitlist') return;
+      if (waitlistEntries.length > 0) return; // Already loaded
+
+      setLoadingWaitlist(true);
+      try {
+        const waitlistRef = collection(db, 'waitlist');
+        const q = query(waitlistRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const entries = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as WaitlistEntry[];
+        setWaitlistEntries(entries);
+      } catch (error) {
+        console.error('Error fetching waitlist:', error);
+      } finally {
+        setLoadingWaitlist(false);
+      }
+    }
+
+    fetchWaitlist();
+  }, [isAdmin, activeTab, waitlistEntries.length]);
+
   // Fetch accommodations data when tab is selected (needed for Rider Prefs, Ledger, and Roster)
   useEffect(() => {
     async function fetchAccommodations() {
@@ -287,26 +353,35 @@ export default function AdminPage() {
           }
         }
 
-        // Fetch all users with accommodation selections
+        // Fetch all users from users collection that have email AND displayName
+        // Include their accommodation selections if available
         const usersRef = collection(db, 'users');
         const usersSnap = await getDocs(usersRef);
         const accommodationData: UserAccommodationData[] = [];
 
         usersSnap.forEach((userDoc) => {
           const userData = userDoc.data();
-          if (userData.accommodationSelections) {
-            // Find matching registration for name/photo
+          // Include users who have email and displayName (or accommodationSelections)
+          const hasIdentity = userData.email && userData.displayName;
+          const hasSelections = userData.accommodationSelections && Object.keys(userData.accommodationSelections).length > 0;
+
+          if (hasIdentity || hasSelections) {
+            // Find matching registration for photo only (not required for name)
             const reg = registrations.find(r => r.uid === userDoc.id);
             accommodationData.push({
               odUserId: userDoc.id,
-              odName: reg?.fullName || userData.displayName || 'Unknown',
-              odHeadshotUrl: reg?.headshotUrl || null,
-              selections: userData.accommodationSelections,
+              odName: userData.displayName || reg?.fullName || userData.email || 'Unknown',
+              odEmail: userData.email || null,
+              odHeadshotUrl: reg?.headshotUrl || userData.photoURL || null,
+              selections: userData.accommodationSelections || {},
               preferredRoommate: userData.preferredRoommate || null,
               dietaryRestrictions: userData.dietaryRestrictions || null
             });
           }
         });
+
+        // Sort by name
+        accommodationData.sort((a, b) => a.odName.localeCompare(b.odName));
 
         setUserAccommodations(accommodationData);
       } catch (error) {
@@ -711,6 +786,144 @@ export default function AdminPage() {
     }
   };
 
+  // Update waitlist entry status
+  const handleUpdateWaitlistStatus = async (entryId: string, newStatus: WaitlistEntry['status']) => {
+    try {
+      await updateDoc(doc(db, 'waitlist', entryId), { status: newStatus });
+      setWaitlistEntries(prev => prev.map(entry =>
+        entry.id === entryId ? { ...entry, status: newStatus } : entry
+      ));
+    } catch (error) {
+      console.error('Error updating waitlist status:', error);
+      alert('Failed to update status.');
+    }
+  };
+
+  // Delete waitlist entry
+  const handleDeleteWaitlistEntry = async (entryId: string) => {
+    if (!confirm('Are you sure you want to delete this waitlist entry?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'waitlist', entryId));
+      setWaitlistEntries(prev => prev.filter(entry => entry.id !== entryId));
+    } catch (error) {
+      console.error('Error deleting waitlist entry:', error);
+      alert('Failed to delete entry.');
+    }
+  };
+
+  // Upload JSON to Firestore
+  const handleJsonUpload = async () => {
+    if (!jsonCollection || !jsonData) {
+      setJsonResult('Error: Please fill in collection and JSON data');
+      return;
+    }
+
+    setUploadingJson(true);
+    setJsonResult(null);
+
+    try {
+      // Parse JSON
+      let data = JSON.parse(jsonData);
+
+      // Convert date strings to Firestore Timestamps
+      const convertDates = (obj: any): any => {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj === 'string') {
+          // Check if it looks like a date
+          if (/^\d{4}-\d{2}-\d{2}/.test(obj)) {
+            return Timestamp.fromDate(new Date(obj));
+          }
+          return obj;
+        }
+        if (Array.isArray(obj)) {
+          return obj.map(convertDates);
+        }
+        if (typeof obj === 'object') {
+          const result: any = {};
+          for (const [key, value] of Object.entries(obj)) {
+            result[key] = convertDates(value);
+          }
+          return result;
+        }
+        return obj;
+      };
+
+      // Upload to Firestore - handle subcollection paths like "events/bajarun2026/roomInventory"
+      const pathSegments = jsonCollection.split('/').filter(s => s.trim());
+
+      const getDocRef = (docId: string) => {
+        if (pathSegments.length === 1) {
+          // Simple collection: e.g., "tours"
+          return doc(db, pathSegments[0], docId);
+        } else if (pathSegments.length === 3) {
+          // Subcollection: e.g., "events/bajarun2026/roomInventory"
+          return doc(db, pathSegments[0], pathSegments[1], pathSegments[2], docId);
+        } else if (pathSegments.length === 5) {
+          // Nested subcollection: e.g., "events/bajarun2026/roomInventory/room1/beds"
+          return doc(db, pathSegments[0], pathSegments[1], pathSegments[2], pathSegments[3], pathSegments[4], docId);
+        } else {
+          throw new Error('Invalid collection path. Use "collection" or "collection/doc/subcollection"');
+        }
+      };
+
+      // Check if it's a batch upload (array with id fields)
+      if (Array.isArray(data) && data.length > 0 && data.every(item => item.id)) {
+        // Batch upload - use each item's id field as document ID
+        let successCount = 0;
+        const errors: string[] = [];
+        const createdDocs: string[] = [];
+
+        console.log(`[Batch Upload] Starting upload of ${data.length} documents to "${jsonCollection}"`);
+
+        for (const item of data) {
+          const itemId = item.id;
+          const itemData = convertDates({ ...item });
+          // Don't store the id as a field since it's the document ID
+          delete itemData.id;
+
+          try {
+            const docRef = getDocRef(itemId);
+            console.log(`[Batch Upload] Writing doc: ${docRef.path}`);
+            await setDoc(docRef, itemData);
+            createdDocs.push(docRef.path);
+            successCount++;
+            console.log(`[Batch Upload] ✓ Created: ${docRef.path}`);
+          } catch (err: any) {
+            console.error(`[Batch Upload] ✗ Failed ${itemId}:`, err);
+            errors.push(`${itemId}: ${err.message}`);
+          }
+        }
+
+        if (errors.length > 0) {
+          setJsonResult(`Uploaded ${successCount}/${data.length} documents. Errors: ${errors.join(', ')}`);
+        } else {
+          setJsonResult(`Success! Uploaded ${successCount} documents to "${jsonCollection}"\n\nDoc paths:\n${createdDocs.join('\n')}`);
+        }
+        setJsonData('');
+      } else {
+        // Single document upload - require document ID
+        if (!jsonDocId) {
+          setJsonResult('Error: Document ID required for single document upload');
+          setUploadingJson(false);
+          return;
+        }
+
+        data = convertDates(data);
+        const docRef = getDocRef(jsonDocId);
+        await setDoc(docRef, data);
+        setJsonResult(`Success! Document "${jsonDocId}" created in "${jsonCollection}"`);
+        setJsonDocId('');
+        setJsonData('');
+      }
+    } catch (error: any) {
+      console.error('Error uploading JSON:', error);
+      setJsonResult(`Error: ${error.message}`);
+    } finally {
+      setUploadingJson(false);
+    }
+  };
+
   // Open deposit modal for a registration
   const openDepositModal = (reg: Registration, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the person
@@ -971,120 +1184,194 @@ export default function AdminPage() {
     return labels[value] || value;
   };
 
+  // Toggle group expansion
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(group)) {
+        newSet.delete(group);
+      } else {
+        newSet.add(group);
+      }
+      return newSet;
+    });
+  };
+
+  // Navigation items grouped by category
+  const navGroups = [
+    {
+      id: 'registration',
+      label: 'Registration',
+      icon: Users,
+      items: [
+        { id: 'registrations', label: 'All Registrations', icon: Users, type: 'tab' as const },
+        { id: 'waitlist', label: `Waitlist${waitlistEntries.length > 0 ? ` (${waitlistEntries.length})` : ''}`, icon: ClipboardList, type: 'tab' as const },
+        { id: 'profileViewer', label: 'Profile Viewer', icon: Eye, type: 'tab' as const },
+        { id: '/admin/registration-cleanup', label: 'Registration Cleanup', icon: Wrench, type: 'link' as const },
+      ]
+    },
+    {
+      id: 'accommodations',
+      label: 'Accommodations',
+      icon: BedDouble,
+      items: [
+        { id: '/admin/room-assignments', label: 'Room Assignments', icon: BedDouble, type: 'link' as const },
+        { id: '/admin/room-selections', label: 'Room Selections', icon: Hotel, type: 'link' as const },
+        { id: 'accommodations', label: 'Rider Preferences', icon: UserCog, type: 'tab' as const },
+        { id: '/admin/rider-preferences', label: 'Edit Preferences', icon: Settings, type: 'link' as const },
+        { id: '/admin/nightly-config', label: 'Nightly Config', icon: Calendar, type: 'link' as const },
+      ]
+    },
+    {
+      id: 'communication',
+      label: 'Communication',
+      icon: Mail,
+      items: [
+        { id: '/admin/tour-update-email', label: 'Tour Update Email', icon: Send, type: 'link' as const },
+        { id: '/admin/email-templates', label: 'Email Templates', icon: FileText, type: 'link' as const },
+        { id: 'email', label: 'Compose Email', icon: Mail, type: 'tab' as const },
+        { id: 'announcements', label: 'Announcements', icon: Megaphone, type: 'tab' as const },
+        { id: 'emailList', label: 'Email List', icon: ClipboardList, type: 'tab' as const },
+      ]
+    },
+    {
+      id: 'financial',
+      label: 'Financial',
+      icon: DollarSign,
+      items: [
+        { id: 'ledger', label: 'Ledger', icon: Receipt, type: 'tab' as const },
+      ]
+    },
+    {
+      id: 'tools',
+      label: 'Tools',
+      icon: Wrench,
+      items: [
+        { id: 'roster', label: 'Roster', icon: FileText, type: 'tab' as const },
+        { id: 'jsonUpload', label: 'JSON Upload', icon: Upload, type: 'tab' as const },
+      ]
+    },
+  ];
+
+  // Sidebar content component
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="p-4 border-b border-slate-700">
+        <h2 className="text-lg font-bold text-white">Admin Dashboard</h2>
+        <p className="text-xs text-slate-400">Baja Tour 2026</p>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto p-2">
+        {navGroups.map(group => (
+          <div key={group.id} className="mb-1">
+            {/* Group Header */}
+            <button
+              onClick={() => toggleGroup(group.id)}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700/50 rounded-lg transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <group.icon className="h-4 w-4 text-slate-400" />
+                <span>{group.label}</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${expandedGroups.has(group.id) ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Group Items */}
+            {expandedGroups.has(group.id) && (
+              <div className="ml-4 mt-1 space-y-0.5">
+                {group.items.map(item => (
+                  item.type === 'link' ? (
+                    <Link
+                      key={item.id}
+                      to={item.id}
+                      onClick={() => setSidebarOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  ) : (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveTab(item.id as any);
+                        setSidebarOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        activeTab === item.id
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </button>
+                  )
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-slate-700">
+        <Link
+          to="/"
+          className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
+        >
+          <Home className="h-4 w-4" />
+          <span>Back to Site</span>
+        </Link>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
-          <p className="text-slate-400">Manage Baja Tour 2026 registrations</p>
+    <div className="min-h-screen flex">
+      {/* Mobile Menu Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Desktop: always visible, Mobile: slide-in */}
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        w-64 bg-slate-800 border-r border-slate-700
+        transform transition-transform duration-200 ease-in-out
+        lg:transform-none
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        {/* Mobile close button */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="lg:hidden absolute top-4 right-4 p-1 text-slate-400 hover:text-white"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <SidebarContent />
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 min-w-0">
+        {/* Mobile Header */}
+        <div className="lg:hidden sticky top-0 z-30 bg-slate-900 border-b border-slate-700 px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <h1 className="text-lg font-bold text-white">Admin Dashboard</h1>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab('registrations')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'registrations'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Users className="h-4 w-4 inline mr-2" />
-            Registrations
-          </button>
-          <button
-            onClick={() => setActiveTab('email')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'email'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Mail className="h-4 w-4 inline mr-2" />
-            Send Email
-          </button>
-          <button
-            onClick={() => setActiveTab('announcements')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'announcements'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Megaphone className="h-4 w-4 inline mr-2" />
-            Announcements
-          </button>
-          <button
-            onClick={() => setActiveTab('emailList')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'emailList'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Mail className="h-4 w-4 inline mr-2" />
-            Email List
-          </button>
-          <button
-            onClick={() => setActiveTab('accommodations')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'accommodations'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <BedDouble className="h-4 w-4 inline mr-2" />
-            Rider Prefs
-          </button>
-          <button
-            onClick={() => setActiveTab('ledger')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'ledger'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Receipt className="h-4 w-4 inline mr-2" />
-            Ledger
-          </button>
-          <button
-            onClick={() => setActiveTab('roster')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'roster'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <FileText className="h-4 w-4 inline mr-2" />
-            Roster
-          </button>
-          <button
-            onClick={() => setActiveTab('profileViewer')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'profileViewer'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Eye className="h-4 w-4 inline mr-2" />
-            View Profile
-          </button>
-
-          {/* Separator */}
-          <div className="h-6 w-px bg-slate-700 mx-2" />
-
-          {/* Config Link */}
-          <Link
-            to="/admin/nightly-config"
-            className="px-4 py-2 rounded-lg font-medium transition-colors bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Daily Config
-          </Link>
-        </div>
-
-        {/* Stats Grid */}
+        <div className="p-4 sm:p-6 lg:p-8">
+          {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
             <div className="flex items-center gap-3 mb-2">
@@ -2118,13 +2405,16 @@ export default function AdminPage() {
 
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-2">
+                                      <div className="flex items-center gap-2 mb-1">
                                         <span className="text-white font-medium">{userData.odName}</span>
                                         <span className="flex items-center gap-1 px-2 py-0.5 bg-slate-700 rounded text-xs">
                                           {accomIcon}
                                           <span className="text-slate-300">{accomLabel}</span>
                                         </span>
                                       </div>
+                                      {userData.odEmail && (
+                                        <p className="text-xs text-slate-400 mb-2">{userData.odEmail}</p>
+                                      )}
 
                                       {/* Selection Details */}
                                       <div className="flex flex-wrap gap-2 text-xs">
@@ -3099,6 +3389,369 @@ export default function AdminPage() {
             )}
           </div>
         )}
+
+        {/* Waitlist Tab */}
+        {activeTab === 'waitlist' && (
+          <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <div className="p-4 border-b border-slate-700">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-amber-400" />
+                Waitlist ({waitlistEntries.length})
+              </h3>
+              <p className="text-sm text-slate-400 mt-1">
+                People who signed up after registration closed. Send them the invite link when a spot opens:
+                <code className="ml-2 px-2 py-0.5 bg-slate-900 rounded text-amber-400 text-xs">
+                  bajarun-2026.web.app/register?invite=baja2026
+                </code>
+              </p>
+            </div>
+
+            {loadingWaitlist ? (
+              <div className="p-8 text-center">
+                <Loader2 className="h-8 w-8 text-blue-400 animate-spin mx-auto mb-2" />
+                <p className="text-slate-400">Loading waitlist...</p>
+              </div>
+            ) : waitlistEntries.length === 0 ? (
+              <div className="p-8 text-center">
+                <ClipboardList className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+                <p className="text-slate-400">No one on the waitlist yet.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-900/50 text-left">
+                      <th className="px-4 py-3 text-slate-400 font-medium">Name</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Event</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Contact</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Location</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Bike</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Pillion</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Status</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Signed Up</th>
+                      <th className="px-4 py-3 text-slate-400 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {waitlistEntries.map(entry => (
+                      <tr key={entry.id} className="hover:bg-slate-700/30">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-white">{entry.fullName}</div>
+                          {entry.notes && (
+                            <div className="text-xs text-slate-500 mt-1 max-w-[200px] truncate" title={entry.notes}>
+                              {entry.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {entry.eventName ? (
+                            <div>
+                              <div className="text-slate-300 text-xs">{entry.eventName}</div>
+                              <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-xs ${
+                                entry.listType === 'interest'
+                                  ? 'bg-purple-600/20 text-purple-400'
+                                  : 'bg-amber-600/20 text-amber-400'
+                              }`}>
+                                {entry.listType === 'interest' ? 'Interest' : 'Waitlist'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-slate-300">
+                            <a href={`mailto:${entry.email}`} className="hover:text-blue-400 block">{entry.email}</a>
+                            <a href={`tel:${entry.phone}`} className="hover:text-blue-400 text-sm text-slate-400">{entry.phone}</a>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-300 whitespace-nowrap">
+                          {entry.city}, {entry.state}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300 whitespace-nowrap">
+                          {entry.bikeYear} {entry.bikeModel}
+                        </td>
+                        <td className="px-4 py-3">
+                          {entry.hasPillion ? (
+                            <span className="px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded text-xs">Yes</span>
+                          ) : (
+                            <span className="text-slate-500">No</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={entry.status}
+                            onChange={(e) => handleUpdateWaitlistStatus(entry.id, e.target.value as WaitlistEntry['status'])}
+                            className={`px-2 py-1 rounded text-xs font-medium border-0 cursor-pointer ${
+                              entry.status === 'pending' ? 'bg-slate-600 text-slate-300' :
+                              entry.status === 'contacted' ? 'bg-amber-600/20 text-amber-400' :
+                              entry.status === 'promoted' ? 'bg-green-600/20 text-green-400' :
+                              'bg-red-600/20 text-red-400'
+                            }`}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="promoted">Promoted</option>
+                            <option value="declined">Declined</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
+                          {entry.createdAt?.toDate?.()?.toLocaleDateString() || 'Unknown'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleDeleteWaitlistEntry(entry.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-600/10 rounded transition-colors"
+                            title="Delete entry"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* JSON Upload Tab */}
+        {activeTab === 'jsonUpload' && (
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+              <Upload className="h-5 w-5 text-purple-400" />
+              Upload JSON to Firestore
+            </h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Paste JSON data to create or update documents. Dates in YYYY-MM-DD format will be converted to Firestore Timestamps.
+              <br />
+              <span className="text-purple-400">Batch upload:</span> Paste an array of objects with <code className="bg-slate-700 px-1 rounded">id</code> fields - each will be created as a separate document.
+            </p>
+
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Collection</label>
+                  <input
+                    type="text"
+                    value={jsonCollection}
+                    onChange={(e) => setJsonCollection(e.target.value)}
+                    placeholder="e.g., tours"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Document ID <span className="text-slate-500">(optional for batch)</span></label>
+                  <input
+                    type="text"
+                    value={jsonDocId}
+                    onChange={(e) => setJsonDocId(e.target.value)}
+                    placeholder="Leave empty for batch upload"
+                    className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">JSON Data</label>
+                <textarea
+                  value={jsonData}
+                  onChange={(e) => setJsonData(e.target.value)}
+                  rows={12}
+                  placeholder='{"name": "Baja 2026 Tour", "status": "closed", ...}'
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 font-mono text-sm"
+                />
+              </div>
+
+              {jsonResult && (
+                <div className={`p-3 rounded-lg ${jsonResult.startsWith('Error') ? 'bg-red-600/20 text-red-400' : 'bg-green-600/20 text-green-400'}`}>
+                  {jsonResult}
+                </div>
+              )}
+
+              <button
+                onClick={handleJsonUpload}
+                disabled={uploadingJson}
+                className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
+              >
+                {uploadingJson ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Upload Document
+                  </>
+                )}
+              </button>
+
+              {/* Quick Templates */}
+              <div className="mt-6 pt-6 border-t border-slate-700">
+                <h4 className="text-sm font-medium text-slate-300 mb-3">Quick Templates</h4>
+                <p className="text-xs text-slate-500 mb-3">
+                  registrationType: open (register), closed (no action), waitlist (join waitlist), interest (get notified)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      setJsonCollection('tours');
+                      setJsonDocId('baja2026');
+                      setJsonData(JSON.stringify({
+                        name: "Baja 2026 Tour",
+                        description: "An epic 9-day motorcycle adventure through Baja California.",
+                        imageUrl: "",
+                        registrationType: "closed",
+                        maxParticipants: 30,
+                        currentParticipants: 30,
+                        depositAmount: 500,
+                        sortOrder: 1,
+                        startDate: "2026-03-14",
+                        endDate: "2026-03-22"
+                      }, null, 2));
+                    }}
+                    className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-300 text-sm rounded transition-colors"
+                  >
+                    Closed Tour
+                  </button>
+                  <button
+                    onClick={() => {
+                      setJsonCollection('tours');
+                      setJsonDocId('baja2026');
+                      setJsonData(JSON.stringify({
+                        name: "Baja 2026 Tour",
+                        description: "An epic 9-day motorcycle adventure through Baja California.",
+                        imageUrl: "",
+                        registrationType: "waitlist",
+                        maxParticipants: 30,
+                        currentParticipants: 30,
+                        depositAmount: 500,
+                        notice: "Registration is full! Join the waitlist and we'll contact you if a spot opens.",
+                        sortOrder: 1,
+                        startDate: "2026-03-14",
+                        endDate: "2026-03-22"
+                      }, null, 2));
+                    }}
+                    className="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-sm rounded transition-colors"
+                  >
+                    Waitlist Tour
+                  </button>
+                  <button
+                    onClick={() => {
+                      setJsonCollection('tours');
+                      setJsonDocId('future-tour');
+                      setJsonData(JSON.stringify({
+                        name: "Future Tour 2027",
+                        description: "Details coming soon! Sign up to get notified when registration opens.",
+                        imageUrl: "",
+                        registrationType: "interest",
+                        maxParticipants: 30,
+                        currentParticipants: 0,
+                        depositAmount: 500,
+                        sortOrder: 2,
+                        startDate: "2027-03-14",
+                        endDate: "2027-03-22"
+                      }, null, 2));
+                    }}
+                    className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-white text-sm rounded transition-colors"
+                  >
+                    Interest (Coming Soon)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setJsonCollection('tours');
+                      setJsonDocId('open-tour');
+                      setJsonData(JSON.stringify({
+                        name: "Open Tour",
+                        description: "Registration is open! Join us for an epic adventure.",
+                        imageUrl: "",
+                        registrationType: "open",
+                        maxParticipants: 30,
+                        currentParticipants: 0,
+                        depositAmount: 500,
+                        sortOrder: 1,
+                        startDate: "2026-06-01",
+                        endDate: "2026-06-10"
+                      }, null, 2));
+                    }}
+                    className="px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white text-sm rounded transition-colors"
+                  >
+                    Open Tour
+                  </button>
+                </div>
+
+                {/* Room Inventory Templates */}
+                <h4 className="text-sm font-medium text-slate-300 mb-3 mt-4">Room Inventory</h4>
+                <p className="text-xs text-slate-500 mb-3">
+                  Collection: events/bajarun2026/roomInventory • isCamping: true for camping spots
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      setJsonCollection('events/bajarun2026/roomInventory');
+                      setJsonDocId('hotel-room-id');
+                      setJsonData(JSON.stringify({
+                        beds: ["Bed 1"],
+                        checkIn: "2026-03-25",
+                        checkOut: "2026-03-26",
+                        day: 7,
+                        id: "hotel-room-id",
+                        isCamping: false,
+                        location: "Tecate",
+                        maxOccupancy: 2,
+                        roomNumber: "R1",
+                        suiteName: "Santuario Diegueño"
+                      }, null, 2));
+                    }}
+                    className="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white text-sm rounded transition-colors"
+                  >
+                    Hotel Room
+                  </button>
+                  <button
+                    onClick={() => {
+                      setJsonCollection('events/bajarun2026/roomInventory');
+                      setJsonDocId('camping-spot-id');
+                      setJsonData(JSON.stringify({
+                        beds: ["Tent"],
+                        checkIn: "2026-03-26",
+                        checkOut: "2026-03-27",
+                        day: 8,
+                        id: "camping-spot-id",
+                        isCamping: true,
+                        location: "Twentynine Palms",
+                        maxOccupancy: 20,
+                        roomNumber: "NA",
+                        suiteName: "Indian Cove Camping"
+                      }, null, 2));
+                    }}
+                    className="px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white text-sm rounded transition-colors"
+                  >
+                    Camping Spot
+                  </button>
+                  <button
+                    onClick={() => {
+                      setJsonCollection('events/bajarun2026/roomInventory');
+                      setJsonDocId('');
+                      setJsonData(JSON.stringify([
+                        { id: "own-day1", suiteName: "On Their Own", roomNumber: "NA", beds: [], maxOccupancy: 50, checkIn: "2026-03-19", checkOut: "2026-03-20", location: "Temecula", day: 1, isOwnAccommodation: true },
+                        { id: "own-day2", suiteName: "On Their Own", roomNumber: "NA", beds: [], maxOccupancy: 50, checkIn: "2026-03-20", checkOut: "2026-03-21", location: "Meiling", day: 2, isOwnAccommodation: true },
+                        { id: "own-day6", suiteName: "On Their Own", roomNumber: "NA", beds: [], maxOccupancy: 50, checkIn: "2026-03-24", checkOut: "2026-03-25", location: "BOLA", day: 6, isOwnAccommodation: true },
+                        { id: "own-day7", suiteName: "On Their Own", roomNumber: "NA", beds: [], maxOccupancy: 50, checkIn: "2026-03-25", checkOut: "2026-03-26", location: "Tecate", day: 7, isOwnAccommodation: true },
+                        { id: "own-day8", suiteName: "On Their Own", roomNumber: "NA", beds: [], maxOccupancy: 50, checkIn: "2026-03-26", checkOut: "2026-03-27", location: "TwentyNine Palms", day: 8, isOwnAccommodation: true }
+                      ], null, 2));
+                    }}
+                    className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-white text-sm rounded transition-colors"
+                  >
+                    On Their Own (All Days)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        </div>
       </div>
 
       {/* Record Deposit Modal */}

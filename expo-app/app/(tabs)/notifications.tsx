@@ -1,11 +1,24 @@
 /**
- * Notifications page - Push notification feed and announcements.
+ * Notifications/Alerts page - Push notification feed and announcements.
+ * Redesigned to match Stitch mockups with dark theme.
  */
 
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineData } from '../../hooks/useOfflineData';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, borderRadius } from '../../constants/theme';
 import {
   registerForPushNotifications,
   isPushSupported,
@@ -13,14 +26,18 @@ import {
   sendTestNotification,
 } from '../../lib/notifications';
 
+type FilterType = 'all' | 'urgent' | 'important' | 'info';
+
 export default function NotificationsPage() {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const { announcements, syncing, refresh, isOnline } = useOfflineData(user?.uid || null);
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationsSupported, setNotificationsSupported] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [filter, setFilter] = useState<FilterType>('all');
 
   // Check notification status on mount
   useEffect(() => {
@@ -51,10 +68,6 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleTestNotification = async () => {
-    await sendTestNotification();
-  };
-
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -72,128 +85,367 @@ export default function NotificationsPage() {
     }
   };
 
+  const getPriorityConfig = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return { color: theme.danger, icon: 'exclamation-circle', label: 'Urgent' };
+      case 'medium':
+        return { color: theme.warning, icon: 'exclamation-triangle', label: 'Important' };
+      default:
+        return { color: theme.info, icon: 'info-circle', label: 'Info' };
+    }
+  };
+
+  const filteredAnnouncements = announcements.filter((a) => {
+    if (filter === 'all') return true;
+    if (filter === 'urgent') return a.priority === 'high';
+    if (filter === 'important') return a.priority === 'medium';
+    return a.priority === 'low' || !a.priority;
+  });
+
+  const urgentCount = announcements.filter((a) => a.priority === 'high').length;
+
+  const filters: { key: FilterType; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'urgent', label: 'Urgent' },
+    { key: 'important', label: 'Important' },
+    { key: 'info', label: 'Info' },
+  ];
+
   return (
-    <View className="flex-1 bg-gray-100">
-      {/* Online status */}
-      <View className={`px-4 py-2 ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}>
-        <Text className="text-white text-center text-sm">
-          {isOnline ? '🟢 Online' : '🔴 Offline - showing cached data'}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: theme.cardBorder }]}>
+        <Text style={[styles.headerTitle, { color: theme.textSecondary }]}>
+          TOUR ALERTS
         </Text>
+        {!isOnline && (
+          <View style={[styles.offlineBadge, { backgroundColor: theme.warning + '20', borderColor: theme.warning }]}>
+            <FontAwesome name="wifi" size={10} color={theme.warning} />
+            <Text style={[styles.offlineText, { color: theme.warning }]}>OFFLINE</Text>
+          </View>
+        )}
       </View>
 
-      {/* Push notification toggle */}
-      {checkingStatus ? (
-        <View className="bg-blue-50 border-b border-blue-200 p-4 flex-row items-center justify-center">
-          <ActivityIndicator size="small" color="#3b82f6" />
-          <Text className="text-blue-700 ml-2">Checking notification status...</Text>
-        </View>
-      ) : notificationsSupported ? (
-        <View className={`border-b p-4 ${notificationsEnabled ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1 mr-4">
-              <Text className={`text-sm font-medium ${notificationsEnabled ? 'text-green-900' : 'text-blue-900'}`}>
-                Push Notifications
-              </Text>
-              <Text className={`text-xs ${notificationsEnabled ? 'text-green-700' : 'text-blue-700'}`}>
-                {notificationsEnabled ? 'Notifications are enabled' : 'Get notified of important updates'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={handleEnableNotifications}
-              disabled={enabling}
-              className={`px-4 py-2 rounded-lg ${
-                notificationsEnabled
-                  ? 'bg-green-600'
-                  : 'bg-blue-600'
-              } ${enabling ? 'opacity-50' : ''}`}
-            >
-              {enabling ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text className="text-white text-sm font-medium">
-                  {notificationsEnabled ? 'Re-register' : 'Enable'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Test notification button (only when enabled) */}
-          {notificationsEnabled && (
-            <TouchableOpacity
-              onPress={handleTestNotification}
-              className="mt-3 py-2"
-            >
-              <Text className="text-green-700 text-xs text-center underline">
-                Send test notification
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <View className="bg-yellow-50 border-b border-yellow-200 p-4">
-          <Text className="text-sm text-yellow-800">
-            Push notifications require a physical device. They won't work in the simulator.
+      {/* Urgent Count Banner */}
+      {urgentCount > 0 && (
+        <View style={[styles.urgentBanner, { backgroundColor: theme.danger + '20' }]}>
+          <FontAwesome name="exclamation-circle" size={18} color={theme.danger} />
+          <Text style={[styles.urgentText, { color: theme.danger }]}>
+            {urgentCount} New Urgent Alert{urgentCount !== 1 ? 's' : ''}
           </Text>
         </View>
       )}
 
-      {/* Header with count */}
-      <View className="bg-white border-b border-gray-200 px-4 py-3 flex-row justify-between items-center">
-        <Text className="text-sm text-gray-500">
-          {announcements.length} notification{announcements.length !== 1 ? 's' : ''}
-        </Text>
+      {/* Push Notification Banner */}
+      {!checkingStatus && notificationsSupported && !notificationsEnabled && (
         <TouchableOpacity
-          onPress={refresh}
-          disabled={syncing}
-          className={`px-4 py-2 bg-blue-500 rounded-lg ${syncing ? 'opacity-50' : ''}`}
+          onPress={handleEnableNotifications}
+          disabled={enabling}
+          style={[styles.enableBanner, { backgroundColor: theme.accent + '20', borderColor: theme.accent }]}
         >
-          <Text className="text-white text-sm font-medium">
-            {syncing ? 'Syncing...' : 'Refresh'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        className="flex-1"
-        refreshControl={
-          <RefreshControl refreshing={syncing} onRefresh={refresh} />
-        }
-      >
-        <View className="p-4">
-          {announcements.length === 0 ? (
-            <View className="bg-white rounded-xl p-6 items-center">
-              <Text className="text-gray-400 text-4xl mb-3">🔔</Text>
-              <Text className="text-gray-500 text-center">
-                No announcements yet.{'\n'}Pull down to refresh.
+          <View style={styles.enableContent}>
+            <FontAwesome name="bell" size={18} color={theme.accent} />
+            <View style={styles.enableTextContainer}>
+              <Text style={[styles.enableTitle, { color: theme.textPrimary }]}>
+                Enable Push Notifications
+              </Text>
+              <Text style={[styles.enableSubtitle, { color: theme.textSecondary }]}>
+                Get notified of important tour updates
               </Text>
             </View>
+          </View>
+          {enabling ? (
+            <ActivityIndicator size="small" color={theme.accent} />
           ) : (
-            announcements.map((announcement) => (
+            <View style={[styles.enableButton, { backgroundColor: theme.accent }]}>
+              <Text style={styles.enableButtonText}>Enable</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {/* Filter Chips */}
+      <View style={[styles.filterContainer, { backgroundColor: theme.card, borderBottomColor: theme.cardBorder }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {filters.map((f) => {
+            const isActive = filter === f.key;
+            return (
+              <TouchableOpacity
+                key={f.key}
+                onPress={() => setFilter(f.key)}
+                style={[
+                  styles.filterChip,
+                  { backgroundColor: isActive ? theme.accent : 'transparent' },
+                  !isActive && { borderWidth: 1, borderColor: theme.cardBorder },
+                ]}
+              >
+                <Text style={[styles.filterText, { color: isActive ? '#ffffff' : theme.textSecondary }]}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Alerts List */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={syncing} onRefresh={refresh} tintColor={theme.accent} />
+        }
+      >
+        {filteredAnnouncements.length === 0 ? (
+          <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+            <View style={[styles.emptyIcon, { backgroundColor: theme.success + '20' }]}>
+              <FontAwesome name="check-circle" size={40} color={theme.success} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+              You're all caught up!
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+              {announcements.length === 0
+                ? 'No announcements yet. Pull down to refresh.'
+                : 'No alerts match this filter.'}
+            </Text>
+          </View>
+        ) : (
+          filteredAnnouncements.map((announcement) => {
+            const priorityConfig = getPriorityConfig(announcement.priority || 'low');
+
+            return (
               <View
                 key={announcement.id}
-                className={`bg-white rounded-xl shadow-sm mb-3 overflow-hidden border-l-4 ${
-                  announcement.priority === 'high' ? 'border-red-500' : 'border-blue-500'
-                }`}
+                style={[
+                  styles.alertCard,
+                  { backgroundColor: theme.card, borderColor: theme.cardBorder },
+                ]}
               >
-                <View className="p-4">
-                  <View className="flex-row justify-between items-start mb-2">
-                    <Text className="text-gray-900 font-semibold flex-1">
-                      {announcement.priority === 'high' && '🚨 '}
-                      {announcement.title}
-                    </Text>
-                    <Text className="text-gray-400 text-xs ml-2">
-                      {formatDate(announcement.createdAt)}
-                    </Text>
+                {/* Priority Indicator */}
+                <View style={[styles.priorityBar, { backgroundColor: priorityConfig.color }]} />
+
+                <View style={styles.alertContent}>
+                  {/* Header Row */}
+                  <View style={styles.alertHeader}>
+                    <View style={[styles.alertIconContainer, { backgroundColor: priorityConfig.color + '20' }]}>
+                      <FontAwesome name={priorityConfig.icon as any} size={16} color={priorityConfig.color} />
+                    </View>
+                    <View style={styles.alertTitleContainer}>
+                      <Text style={[styles.alertTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {announcement.title}
+                      </Text>
+                      <Text style={[styles.alertTime, { color: theme.textMuted }]}>
+                        {formatDate(announcement.createdAt)}
+                      </Text>
+                    </View>
                   </View>
-                  <Text className="text-gray-600 text-sm">
+
+                  {/* Body */}
+                  <Text style={[styles.alertBody, { color: theme.textSecondary }]}>
                     {announcement.body}
                   </Text>
+
+                  {/* Priority Badge */}
+                  <View style={styles.alertFooter}>
+                    <View style={[styles.priorityBadge, { backgroundColor: priorityConfig.color + '20' }]}>
+                      <Text style={[styles.priorityText, { color: priorityConfig.color }]}>
+                        {priorityConfig.label}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
-            ))
-          )}
-        </View>
+            );
+          })
+        )}
+
+        {/* Bottom spacing */}
+        <View style={{ height: spacing['3xl'] }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  headerTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  offlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  offlineText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  urgentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  urgentText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  enableBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+  },
+  enableContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  enableTextContainer: {
+    flex: 1,
+  },
+  enableTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  enableSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  enableButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+  },
+  enableButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterContainer: {
+    borderBottomWidth: 1,
+  },
+  filterScroll: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  filterChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    marginRight: spacing.sm,
+  },
+  filterText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: spacing.lg,
+  },
+  emptyCard: {
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    padding: spacing['3xl'],
+    alignItems: 'center',
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  alertCard: {
+    flexDirection: 'row',
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+  },
+  priorityBar: {
+    width: 4,
+  },
+  alertContent: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  alertHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  alertIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertTitleContainer: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  alertTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  alertTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  alertBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
+  },
+  alertFooter: {
+    flexDirection: 'row',
+  },
+  priorityBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+  },
+  priorityText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+});

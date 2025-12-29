@@ -1,0 +1,473 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 360px;
+  background: #16213e;
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 1px solid #0f3460;
+}
+
+.sidebar h1 {
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  color: #e94560;
+}
+
+.section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #0f3460;
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.section h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 4px;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+
+input[type="text"],
+input[type="number"],
+textarea,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  background: #0f3460;
+  border: 1px solid #1a4a7a;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #e94560;
+}
+
+select {
+  cursor: pointer;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #e94560;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #d63850;
+}
+
+.btn-secondary {
+  background: #0f3460;
+  color: #fff;
+  border: 1px solid #1a4a7a;
+}
+
+.btn-secondary:hover {
+  background: #1a4a7a;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  background: #0f3460;
+  color: #aaa;
+  border: 1px solid #1a4a7a;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+/* Discover buttons */
+.discover-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-discover {
+  flex: 1;
+  min-width: 100px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  background: #0f3460;
+  color: #fff;
+  border: 1px solid #1a4a7a;
+}
+
+.btn-discover:hover {
+  background: #1a4a7a;
+}
+
+.btn-discover.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Route info */
+.route-info {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #0f3460;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #4ade80;
+}
+
+/* Search results */
+.search-results {
+  margin-top: 12px;
+  background: #0f3460;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #1a4a7a;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #1a4a7a;
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-meta {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 2px;
+}
+
+.result-item .btn {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  margin-left: 8px;
+}
+
+/* Route items */
+.route-items {
+  background: #0f3460;
+  border-radius: 8px;
+  min-height: 100px;
+}
+
+.empty-message {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.route-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #1a4a7a;
+  gap: 10px;
+}
+
+.route-item:last-child {
+  border-bottom: none;
+}
+
+.route-item-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.route-item-icon.start { background: #22c55e; color: #000; }
+.route-item-icon.end { background: #ef4444; color: #fff; }
+.route-item-icon.waypoint { background: #3b82f6; color: #fff; }
+.route-item-icon.gas { background: #facc15; color: #000; }
+.route-item-icon.restaurant { background: #fb923c; color: #000; }
+.route-item-icon.poi { background: #3b82f6; color: #fff; }
+.route-item-icon.viewpoint { background: #22c55e; color: #000; }
+.route-item-icon.photo { background: #a855f7; color: #fff; }
+.route-item-icon.border { background: #ef4444; color: #fff; }
+.route-item-icon.emergency { background: #dc2626; color: #fff; }
+
+.route-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.route-item-name {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.route-item-coords {
+  font-size: 0.7rem;
+  color: #666;
+  font-family: monospace;
+}
+
+.route-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.route-item-actions button {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid #1a4a7a;
+  color: #888;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.route-item-actions button:hover {
+  background: #1a4a7a;
+  color: #fff;
+}
+
+.route-item-actions button.delete:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+/* Actions section */
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.actions .btn {
+  flex: 1;
+}
+
+/* Map */
+.map-container {
+  flex: 1;
+  position: relative;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-instructions {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(22, 33, 62, 0.9);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: #aaa;
+  pointer-events: none;
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #16213e;
+  padding: 24px;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+}
+
+.modal-content h3 {
+  margin-bottom: 20px;
+  color: #e94560;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-actions .btn {
+  flex: 1;
+}
+
+/* Custom Leaflet markers */
+.custom-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  border: 2px solid white;
+}
+
+.custom-marker.start { background: #22c55e; color: #000; }
+.custom-marker.end { background: #ef4444; color: #fff; }
+.custom-marker.waypoint { background: #3b82f6; color: #fff; }
+.custom-marker.gas { background: #facc15; color: #000; }
+.custom-marker.restaurant { background: #fb923c; color: #000; }
+.custom-marker.poi { background: #3b82f6; color: #fff; }
+.custom-marker.viewpoint { background: #22c55e; color: #000; }
+.custom-marker.photo { background: #a855f7; color: #fff; }
+.custom-marker.border { background: #ef4444; color: #fff; }
+.custom-marker.emergency { background: #dc2626; color: #fff; }
+
+/* Leaflet popup overrides */
+.leaflet-popup-content-wrapper {
+  background: #16213e;
+  color: #fff;
+  border-radius: 8px;
+}
+
+.leaflet-popup-tip {
+  background: #16213e;
+}
+
+.leaflet-popup-content {
+  margin: 12px;
+}
+
+.popup-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.popup-coords {
+  font-size: 0.75rem;
+  color: #888;
+  font-family: monospace;
+}
+
+.popup-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.popup-actions button {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  background: #0f3460;
+  border: 1px solid #1a4a7a;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.popup-actions button:hover {
+  background: #1a4a7a;
+}
+
+.popup-actions button.delete {
+  background: #ef4444;
+  border-color: #ef4444;
+}

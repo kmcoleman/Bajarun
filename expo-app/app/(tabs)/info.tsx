@@ -1,15 +1,23 @@
 /**
  * Info page - General trip reference information.
+ * Redesigned to match Stitch mockups with dark theme.
  */
 
-import { View, Text, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FontAwesome } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, borderRadius } from '../../constants/theme';
 
 export default function InfoPage() {
+  const { theme } = useTheme();
+
   const emergencyContacts = [
-    { name: 'US Embassy (Mexico City)', phone: '+52-55-5080-2000' },
-    { name: 'US Consulate (Tijuana)', phone: '+52-664-977-2000' },
-    { name: 'Mexico Emergency', phone: '911' },
-    { name: 'Mexican Red Cross', phone: '065' },
+    { name: 'Support Truck', phone: '+1-555-SUPPORT', icon: 'truck', color: theme.warning },
+    { name: 'Tour Leader', phone: '+1-555-LEADER', icon: 'user', color: theme.accent },
+    { name: 'Mexico Emergency (911)', phone: '911', icon: 'phone', color: theme.danger },
+    { name: 'US Embassy (Mexico City)', phone: '+52-55-5080-2000', icon: 'building', color: theme.info },
+    { name: 'Mexican Red Cross', phone: '065', icon: 'plus-square', color: theme.danger },
   ];
 
   const spanishPhrases = [
@@ -23,106 +31,321 @@ export default function InfoPage() {
     { english: 'Thank you', spanish: 'Gracias' },
   ];
 
-  const makeCalls = (phone: string) => {
+  const bajaTips = [
+    { title: 'Gas Stations', tip: 'Fill up at every opportunity. Stations can be 100+ miles apart in remote areas.', icon: 'tint' },
+    { title: 'Water', tip: 'Carry at least 2 liters. The desert is unforgiving.', icon: 'tint' },
+    { title: 'Speed', tip: 'Watch for topes (speed bumps), livestock, and road debris.', icon: 'warning' },
+    { title: 'Money', tip: 'Carry pesos for smaller towns. Many places don\'t accept cards.', icon: 'money' },
+  ];
+
+  const checklist = [
+    'Valid passport',
+    'Mexican vehicle permit (if required)',
+    'FMM tourist card',
+    'Mexican liability insurance',
+    'Vehicle registration',
+    "Driver's license",
+    'Proof of citizenship',
+  ];
+
+  const makeCall = (phone: string) => {
     Linking.openURL(`tel:${phone}`);
   };
 
   return (
-    <ScrollView className="flex-1 bg-gray-100">
-      <View className="p-4">
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: theme.cardBorder }]}>
+        <Text style={[styles.headerTitle, { color: theme.textSecondary }]}>
+          GENERAL INFO
+        </Text>
+        <View style={[styles.offlineBadge, { backgroundColor: theme.success + '20', borderColor: theme.success }]}>
+          <FontAwesome name="wifi" size={10} color={theme.success} />
+          <Text style={[styles.offlineText, { color: theme.success }]}>OFFLINE READY</Text>
+        </View>
+      </View>
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Emergency Contacts */}
-        <View className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
-          <View className="bg-red-600 px-4 py-2">
-            <Text className="text-white text-sm font-medium">🚨 Emergency Contacts</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <FontAwesome name="ambulance" size={16} color={theme.danger} />
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+              Emergency Contacts
+            </Text>
           </View>
-          <View className="p-4">
-            {emergencyContacts.map((contact, idx) => (
-              <TouchableOpacity
+
+          {emergencyContacts.map((contact, idx) => (
+            <TouchableOpacity
+              key={idx}
+              onPress={() => makeCall(contact.phone)}
+              style={[styles.contactCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
+            >
+              <View style={[styles.contactIcon, { backgroundColor: contact.color + '20' }]}>
+                <FontAwesome name={contact.icon as any} size={18} color={contact.color} />
+              </View>
+              <View style={styles.contactInfo}>
+                <Text style={[styles.contactName, { color: theme.textPrimary }]}>
+                  {contact.name}
+                </Text>
+                <Text style={[styles.contactPhone, { color: theme.textSecondary }]}>
+                  {contact.phone}
+                </Text>
+              </View>
+              <View style={[styles.callButton, { backgroundColor: theme.success }]}>
+                <FontAwesome name="phone" size={14} color="#ffffff" />
+                <Text style={styles.callButtonText}>Call</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Border Crossing Checklist */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <FontAwesome name="check-square-o" size={16} color={theme.accent} />
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+              Border Crossing Checklist
+            </Text>
+          </View>
+
+          <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+            {checklist.map((item, idx) => (
+              <View
                 key={idx}
-                onPress={() => makeCalls(contact.phone)}
-                className="flex-row justify-between items-center py-3 border-b border-gray-100 last:border-0"
+                style={[
+                  styles.checklistItem,
+                  idx < checklist.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.cardBorder },
+                ]}
               >
-                <Text className="text-gray-900 flex-1">{contact.name}</Text>
-                <Text className="text-blue-600 font-medium">{contact.phone}</Text>
-              </TouchableOpacity>
+                <View style={[styles.checkbox, { borderColor: theme.success, backgroundColor: theme.success + '20' }]}>
+                  <FontAwesome name="check" size={10} color={theme.success} />
+                </View>
+                <Text style={[styles.checklistText, { color: theme.textPrimary }]}>
+                  {item}
+                </Text>
+              </View>
             ))}
           </View>
+        </View>
+
+        {/* Riding Tips */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <FontAwesome name="road" size={16} color={theme.warning} />
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+              Riding in Mexico
+            </Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tipsRow}
+          >
+            {bajaTips.map((tip, idx) => (
+              <View
+                key={idx}
+                style={[styles.tipCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
+              >
+                <View style={[styles.tipIcon, { backgroundColor: theme.warning + '20' }]}>
+                  <FontAwesome name={tip.icon as any} size={20} color={theme.warning} />
+                </View>
+                <Text style={[styles.tipTitle, { color: theme.textPrimary }]}>
+                  {tip.title}
+                </Text>
+                <Text style={[styles.tipText, { color: theme.textSecondary }]}>
+                  {tip.tip}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
         </View>
 
         {/* Spanish Phrases */}
-        <View className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
-          <View className="bg-green-600 px-4 py-2">
-            <Text className="text-white text-sm font-medium">🇲🇽 Spanish Phrases</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <FontAwesome name="language" size={16} color={theme.info} />
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+              Spanish Phrases
+            </Text>
           </View>
-          <View className="p-4">
+
+          <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
             {spanishPhrases.map((phrase, idx) => (
               <View
                 key={idx}
-                className="py-3 border-b border-gray-100 last:border-0"
+                style={[
+                  styles.phraseItem,
+                  idx < spanishPhrases.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.cardBorder },
+                ]}
               >
-                <Text className="text-gray-900 font-medium">{phrase.english}</Text>
-                <Text className="text-gray-600 text-sm mt-1">{phrase.spanish}</Text>
+                <Text style={[styles.englishText, { color: theme.textPrimary }]}>
+                  {phrase.english}
+                </Text>
+                <Text style={[styles.spanishText, { color: theme.accent }]}>
+                  {phrase.spanish}
+                </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Baja Tips */}
-        <View className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
-          <View className="bg-baja-orange px-4 py-2">
-            <Text className="text-white text-sm font-medium">🌵 Baja Tips</Text>
-          </View>
-          <View className="p-4">
-            <View className="mb-3">
-              <Text className="text-gray-900 font-medium">Gas Stations</Text>
-              <Text className="text-gray-600 text-sm mt-1">
-                Fill up at every opportunity. Stations can be 100+ miles apart in remote areas.
-              </Text>
-            </View>
-            <View className="mb-3">
-              <Text className="text-gray-900 font-medium">Water</Text>
-              <Text className="text-gray-600 text-sm mt-1">
-                Carry at least 2 liters. The desert is unforgiving.
-              </Text>
-            </View>
-            <View className="mb-3">
-              <Text className="text-gray-900 font-medium">Speed</Text>
-              <Text className="text-gray-600 text-sm mt-1">
-                Watch for topes (speed bumps), livestock, and road debris.
-              </Text>
-            </View>
-            <View>
-              <Text className="text-gray-900 font-medium">Money</Text>
-              <Text className="text-gray-600 text-sm mt-1">
-                Carry pesos for smaller towns. Many places don't accept cards.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Border Crossing */}
-        <View className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
-          <View className="bg-baja-dark px-4 py-2">
-            <Text className="text-white text-sm font-medium">🛂 Border Crossing Checklist</Text>
-          </View>
-          <View className="p-4">
-            {[
-              'Valid passport',
-              'Mexican vehicle permit (if required)',
-              'FMM tourist card',
-              'Mexican liability insurance',
-              'Vehicle registration',
-              "Driver's license",
-              'Proof of citizenship',
-            ].map((item, idx) => (
-              <View key={idx} className="flex-row items-center py-2">
-                <Text className="text-green-600 mr-3">✓</Text>
-                <Text className="text-gray-700">{item}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-    </ScrollView>
+        {/* Bottom spacing */}
+        <View style={{ height: spacing['3xl'] }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  headerTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  offlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  offlineText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: spacing.lg,
+  },
+  section: {
+    marginBottom: spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  contactCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
+  contactIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactInfo: {
+    flex: 1,
+    marginLeft: spacing.md,
+  },
+  contactName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  contactPhone: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  callButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+  },
+  callButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  card: {
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  checklistText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  tipsRow: {
+    paddingRight: spacing.lg,
+    gap: spacing.md,
+  },
+  tipCard: {
+    width: 200,
+    padding: spacing.lg,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+  },
+  tipIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  tipText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  phraseItem: {
+    padding: spacing.md,
+  },
+  englishText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  spanishText: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+});

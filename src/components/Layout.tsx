@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, updateDoc, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { formatPhoneNumber } from '../utils/formatters';
 import {
   Home,
   Map,
@@ -49,6 +50,7 @@ const ADMIN_UID = 'kGEO7bTgqMMsDfXmkumneI44S9H2';
 // Public nav items - always visible
 const publicNavItems = [
   { path: '/', label: 'Home', icon: Home },
+  { path: '/tours', label: 'Events', icon: Calendar },
   { path: '/itinerary', label: 'Itinerary', icon: Map },
   { path: '/faq', label: 'FAQ', icon: HelpCircle },
   { path: '/guide', label: 'Support', icon: LifeBuoy },
@@ -77,8 +79,11 @@ interface Announcement {
   createdBy: string;
 }
 
+// Pages that don't require terms acceptance
+const PUBLIC_PAGES = ['/', '/login', '/agree', '/privacy', '/terms', '/support', '/faq', '/guide', '/itinerary', '/waitlist', '/tours'];
+
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, hasRegistration, termsAccepted, termsLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -96,6 +101,17 @@ export default function Layout({ children }: LayoutProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Redirect to terms agreement if user hasn't accepted
+  useEffect(() => {
+    if (loading || termsLoading) return;
+    if (!user) return; // Not logged in, no redirect needed
+
+    const isPublicPage = PUBLIC_PAGES.includes(location.pathname);
+    if (!termsAccepted && !isPublicPage) {
+      navigate('/agree');
+    }
+  }, [user, loading, termsAccepted, termsLoading, location.pathname, navigate]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -122,8 +138,13 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [user]);
 
-  // Subscribe to announcements
+  // Subscribe to announcements (only if authenticated)
   useEffect(() => {
+    if (!user) {
+      setAnnouncements([]);
+      return;
+    }
+
     const q = query(
       collection(db, 'announcements'),
       orderBy('createdAt', 'desc')
@@ -135,10 +156,13 @@ export default function Layout({ children }: LayoutProps) {
         ...doc.data()
       })) as Announcement[];
       setAnnouncements(data);
+    }, (error) => {
+      console.error('Error fetching announcements:', error);
+      setAnnouncements([]);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // Mark announcement as read
   const markAsRead = (announcementId: string) => {
@@ -201,18 +225,6 @@ export default function Layout({ children }: LayoutProps) {
 
     fetchProfile();
   }, [user, profileOpen, profileData]);
-
-  // Format phone number
-  const formatPhoneNumber = (value: string): string => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.length <= 3) {
-      return digits.length > 0 ? `(${digits}` : '';
-    } else if (digits.length <= 6) {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-    } else {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
-    }
-  };
 
   // Save profile changes
   const handleSaveProfile = async () => {
@@ -296,12 +308,14 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Bike className="h-6 w-6 text-white" />
-              </div>
+              <img
+                src="/logo.png"
+                alt="NorCal Moto Adventure"
+                className="w-10 h-10 rounded-full object-cover"
+              />
               <div className="hidden sm:block">
-                <div className="text-white font-bold text-lg">BMW Baja Tour</div>
-                <div className="text-slate-400 text-xs">March 2026</div>
+                <div className="text-white font-bold text-lg">NorCal Moto ADV</div>
+                <div className="text-slate-400 text-xs">Baja 2026</div>
               </div>
             </Link>
 
@@ -325,8 +339,8 @@ export default function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
-              {/* Auth-only nav items - Discussion & Participants */}
-              {user && authNavItems.map((item) => {
+              {/* Auth-only nav items - Discussion & Participants (only for registered users) */}
+              {user && hasRegistration && authNavItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
@@ -628,6 +642,22 @@ export default function Layout({ children }: LayoutProps) {
                                       <Mail className="h-4 w-4" />
                                       Email Templates
                                     </Link>
+                                    <Link
+                                      to="/admin/room-assignments"
+                                      onClick={() => setProfileOpen(false)}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                    >
+                                      <BedDouble className="h-4 w-4" />
+                                      Room Assignments
+                                    </Link>
+                                    <Link
+                                      to="/admin/registrations"
+                                      onClick={() => setProfileOpen(false)}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                    >
+                                      <User className="h-4 w-4" />
+                                      Enter Registrations
+                                    </Link>
                                   </div>
                                 </div>
                               )}
@@ -697,7 +727,7 @@ export default function Layout({ children }: LayoutProps) {
                       onClick={handleSignIn}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
                     >
-                      Join the Tour
+                      Login
                     </button>
                   )}
                 </div>
@@ -741,8 +771,8 @@ export default function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
-              {/* Auth-only nav items - Discussion & Participants */}
-              {user && authNavItems.map((item) => {
+              {/* Auth-only nav items - Discussion & Participants (only for registered users) */}
+              {user && hasRegistration && authNavItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
@@ -807,6 +837,22 @@ export default function Layout({ children }: LayoutProps) {
                         >
                           <Mail className="h-5 w-5" />
                           <span>Email Templates</span>
+                        </Link>
+                        <Link
+                          to="/admin/room-assignments"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <BedDouble className="h-5 w-5" />
+                          <span>Room Assignments</span>
+                        </Link>
+                        <Link
+                          to="/admin/registrations"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <User className="h-5 w-5" />
+                          <span>Enter Registrations</span>
                         </Link>
                       </div>
                     )}
@@ -891,7 +937,7 @@ export default function Layout({ children }: LayoutProps) {
                     }}
                     className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium"
                   >
-                    Join the Tour
+                    Login
                   </button>
                 )}
               </div>

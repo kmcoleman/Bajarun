@@ -25,7 +25,10 @@ import {
   Landmark,
   Waves,
   Camera,
-  Palmtree
+  Palmtree,
+  Smartphone,
+  Bell,
+  Image
 } from 'lucide-react';
 import { tripSummary, totalMiles } from '../data/itinerary';
 
@@ -44,6 +47,7 @@ export default function HomePage() {
   const highlightsRef = useRef<HTMLElement>(null);
   const routeRef = useRef<HTMLElement>(null);
   const quoteRef = useRef<HTMLElement>(null);
+  const mobileAppRef = useRef<HTMLElement>(null);
   const ctaRef = useRef<HTMLElement>(null);
 
   // Countdown timer
@@ -93,7 +97,7 @@ export default function HomePage() {
       });
     }, observerOptions);
 
-    const sections = [aboutRef, highlightsRef, routeRef, quoteRef, ctaRef];
+    const sections = [aboutRef, highlightsRef, routeRef, quoteRef, mobileAppRef, ctaRef];
     sections.forEach(ref => {
       if (ref.current) {
         fadeObserver.observe(ref.current);
@@ -165,41 +169,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen -mt-16">
-      {/* Registration Deadline Watermark */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          pointerEvents: 'none',
-          zIndex: 9999,
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: '120px',
-            right: '-60px',
-            background: 'rgba(220, 38, 38, 0.65)',
-            color: 'white',
-            padding: '18px 120px 18px 240px',
-            fontWeight: 700,
-            fontSize: '24px',
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-            transform: 'rotate(45deg)',
-            boxShadow: '0 6px 30px rgba(0,0,0,0.3)',
-            textAlign: 'center',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Registration Closing Dec 24
-        </div>
-      </div>
-
       {/* CSS for animations */}
       <style>{`
         @keyframes float {
@@ -610,6 +579,134 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Mobile App Section */}
+      <section
+        ref={mobileAppRef}
+        className="py-24 bg-slate-900 opacity-0 translate-y-8 transition-all duration-700"
+      >
+        <div className="max-w-7xl mx-auto px-6">
+          {/* Section Header */}
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-2 mb-6">
+              <Smartphone className="h-4 w-4 text-blue-400" />
+              <span className="text-blue-400 text-sm font-medium">Available on iOS & Android</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              Stay Connected on the Road
+            </h2>
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+              Access tour information, connect with fellow riders, and stay updated with our mobile app.
+            </p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-12 items-center">
+            {/* Features */}
+            <div className="w-full lg:w-1/2 space-y-6">
+              <div className="card-lift bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-start gap-4">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Map className="h-6 w-6 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-1">Real-Time Itinerary</h3>
+                  <p className="text-slate-400 text-sm">Access the full route, daily plans, and interactive maps even offline.</p>
+                </div>
+              </div>
+
+              <div className="card-lift bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-start gap-4">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Users className="h-6 w-6 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-1">Rider Roster</h3>
+                  <p className="text-slate-400 text-sm">See who's joining the adventure and connect with fellow riders.</p>
+                </div>
+              </div>
+
+              <div className="card-lift bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-start gap-4">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Bell className="h-6 w-6 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-1">Push Notifications</h3>
+                  <p className="text-slate-400 text-sm">Get important updates, route changes, and group announcements instantly.</p>
+                </div>
+              </div>
+
+              <div className="card-lift bg-slate-800 border border-slate-700 rounded-xl p-6 flex items-start gap-4">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Image className="h-6 w-6 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-1">Photo Gallery</h3>
+                  <p className="text-slate-400 text-sm">Share and view photos from the trip with all participants.</p>
+                </div>
+              </div>
+
+              {/* App Store Badges */}
+              <div className="flex flex-wrap gap-4 pt-4">
+                <a
+                  href="https://apps.apple.com/app/baja-run-2026/id6740092091"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-transform hover:scale-105"
+                >
+                  <img
+                    src="/app-store-badge.svg"
+                    alt="Download on the App Store"
+                    className="h-12"
+                  />
+                </a>
+                <a
+                  href="#"
+                  className="transition-transform hover:scale-105 opacity-50 cursor-not-allowed"
+                  title="Coming Soon"
+                >
+                  <img
+                    src="/google-play-badge.png"
+                    alt="Get it on Google Play"
+                    className="h-12"
+                  />
+                </a>
+                <span className="text-slate-500 text-sm self-center">(Android coming soon)</span>
+              </div>
+            </div>
+
+            {/* Phone Screenshots */}
+            <div className="w-full lg:w-1/2 flex justify-center">
+              <div className="relative">
+                {/* Background glow */}
+                <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full" />
+
+                {/* Phone mockups */}
+                <div className="relative flex items-center justify-center gap-6">
+                  {/* Left phone */}
+                  <div className="relative w-48 md:w-56 z-10 transform -rotate-6 hover:rotate-0 transition-transform duration-300">
+                    <div className="bg-slate-800 rounded-[2rem] p-2 shadow-2xl border border-slate-700">
+                      <img
+                        src="/Notices.jpg"
+                        alt="Notices Screen"
+                        className="rounded-[1.5rem] w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right phone */}
+                  <div className="relative w-48 md:w-56 z-10 transform rotate-6 hover:rotate-0 transition-transform duration-300">
+                    <div className="bg-slate-800 rounded-[2rem] p-2 shadow-2xl border border-slate-700">
+                      <img
+                        src="/Registration.jpg"
+                        alt="Registration Screen"
+                        className="rounded-[1.5rem] w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section
         ref={ctaRef}
@@ -642,6 +739,45 @@ export default function HomePage() {
           </p>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 border-t border-slate-800 py-12">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            {/* Logo / Brand */}
+            <div className="text-center md:text-left">
+              <p className="text-white font-bold text-lg">NorCal Moto Adventure</p>
+              <p className="text-slate-500 text-sm mt-1">Baja California Adventure 2026</p>
+            </div>
+
+            {/* Links */}
+            <div className="flex flex-wrap justify-center gap-6 text-sm">
+              <Link to="/faq" className="text-slate-400 hover:text-blue-400 transition-colors">
+                FAQ
+              </Link>
+              <Link to="/itinerary" className="text-slate-400 hover:text-blue-400 transition-colors">
+                Itinerary
+              </Link>
+              <Link to="/register" className="text-slate-400 hover:text-blue-400 transition-colors">
+                Register
+              </Link>
+              <Link to="/privacy" className="text-slate-400 hover:text-blue-400 transition-colors">
+                Privacy Policy
+              </Link>
+              <Link to="/terms" className="text-slate-400 hover:text-blue-400 transition-colors">
+                Terms of Service
+              </Link>
+            </div>
+          </div>
+
+          {/* Copyright */}
+          <div className="mt-8 pt-6 border-t border-slate-800 text-center">
+            <p className="text-slate-500 text-sm">
+              &copy; {new Date().getFullYear()} NorCal Moto Adventure. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

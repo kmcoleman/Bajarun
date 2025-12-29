@@ -31,3 +31,6 @@ serviceAccountKey.json
 # Generated demographics output
 functions/rider-demographics.html
 functions/rider-demographics.pdf
+
+# Firebase emulator data (local development)
+emulator-data/

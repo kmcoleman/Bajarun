@@ -12,6 +12,7 @@ import { User, Bike, MapPin, LogIn, Loader2, Phone, Mail, MessageCircle, Map as 
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { formatPhoneDisplay } from '../utils/formatters';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -66,18 +67,6 @@ interface Participant {
   hasPillion?: boolean;
 }
 
-// Format phone number to (xxx) xxx-xxxx
-function formatPhoneNumber(phone: string): string {
-  if (!phone) return '';
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  if (digits.length === 11 && digits[0] === '1') {
-    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-  }
-  return phone; // Return original if can't format
-}
 
 // Get digits only for tel: links
 function getPhoneDigits(phone: string): string {
@@ -535,7 +524,7 @@ function ParticipantCard({ person, featured }: ParticipantCardProps) {
                   className="text-slate-300 hover:text-white transition-colors"
                   title="Call"
                 >
-                  {formatPhoneNumber(person.phone)}
+                  {formatPhoneDisplay(person.phone)}
                 </a>
                 <a
                   href={`sms:${getPhoneDigits(person.phone)}`}

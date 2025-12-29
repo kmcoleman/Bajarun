@@ -7,10 +7,16 @@
 
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onObjectFinalized} from "firebase-functions/v2/storage";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import sgMail from "@sendgrid/mail";
 import {defineSecret} from "firebase-functions/params";
+import * as path from "path";
+import * as os from "os";
+import * as fs from "fs";
+import sharp from "sharp";
+import Stripe from "stripe";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -21,6 +27,9 @@ admin.initializeApp();
 
 // SendGrid API key stored as a secret
 const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
+
+// Stripe API key stored as a secret
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 
 // Admin UID - only this user can send emails
 const ADMIN_UID = "kGEO7bTgqMMsDfXmkumneI44S9H2";
@@ -194,6 +203,79 @@ export const sendBulkEmail = onCall(
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       logger.error("[BajaEmail] sendBulkEmail failed", {error: errorMessage});
       throw new HttpsError("internal", "Failed to send bulk email");
+    }
+  }
+);
+
+/**
+ * Send personalized emails with pre-rendered HTML content per recipient
+ * Used for tour update emails with individual rider data
+ */
+export const sendPersonalizedEmails = onCall(
+  {
+    secrets: [sendgridApiKey],
+  },
+  async (request) => {
+    requireAdmin(request.auth);
+
+    const {emails} = request.data as {
+      emails: Array<{
+        to: string;
+        subject: string;
+        html: string;
+        fullName?: string;
+      }>;
+    };
+
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      throw new HttpsError("invalid-argument", "Emails array is required");
+    }
+
+    logger.info("[BajaEmail] sendPersonalizedEmails called", {
+      uid: request.auth?.uid,
+      count: emails.length,
+    });
+
+    try {
+      sgMail.setApiKey(sendgridApiKey.value());
+
+      let sent = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (const email of emails) {
+        try {
+          const emailData = {
+            to: email.to,
+            from: {
+              email: FROM_EMAIL,
+              name: FROM_NAME,
+            },
+            replyTo: REPLY_TO_EMAIL,
+            subject: email.subject,
+            html: email.html,
+          };
+
+          await sgMail.send(emailData);
+          sent++;
+          logger.info("[BajaEmail] Personalized email sent", {to: email.to});
+        } catch (e: unknown) {
+          failed++;
+          const errorMessage = e instanceof Error ? e.message : "Unknown error";
+          errors.push(`${email.to}: ${errorMessage}`);
+          logger.error("[BajaEmail] Failed to send personalized email", {
+            to: email.to,
+            error: errorMessage,
+          });
+        }
+      }
+
+      logger.info("[BajaEmail] sendPersonalizedEmails completed", {sent, failed});
+      return {sent, failed, errors: errors.slice(0, 10)};
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[BajaEmail] sendPersonalizedEmails failed", {error: errorMessage});
+      throw new HttpsError("internal", "Failed to send personalized emails");
     }
   }
 );
@@ -417,6 +499,235 @@ export const onNewRegistration = onDocumentCreated(
 );
 
 /**
+ * Seed itinerary data to Firestore
+ * Admin-only function to populate eventConfig/itinerary document
+ */
+export const seedItinerary = onCall(
+  async (request) => {
+    requireAdmin(request.auth);
+
+    const db = admin.firestore();
+
+    // Itinerary data
+    const itineraryDays = [
+      {
+        day: 1,
+        date: "March 19, 2026",
+        title: "Arrival & Meet in Temecula",
+        description: "Riders make their way to Temecula, California on their own to meet up for orientation, bike checks, and welcome dinner. We'll review the route, safety protocols, and get to know fellow riders before heading south together.",
+        miles: 0,
+        ridingTime: "N/A",
+        startPoint: "Temecula, CA",
+        endPoint: "Temecula, CA",
+        accommodation: "Best Western Plus Temecula",
+        accommodationType: "hotel",
+        accommodationLinks: [
+          {name: "Best Western Plus Temecula", url: "https://bestwesternplustemecula.bookonline.com/hotel/best-western-plus-temecula-wine-country-hotel-&suites?id2=129193716631", type: "hotel"},
+        ],
+        pointsOfInterest: [
+          "Welcome dinner and orientation",
+          "Bike inspection and preparation",
+          "Route briefing and safety review",
+          "Document check (passport, insurance, registration)",
+        ],
+        coordinates: {start: [33.4936, -117.1484], end: [33.4936, -117.1484]},
+      },
+      {
+        day: 2,
+        date: "March 20, 2026",
+        title: "Temecula to Rancho Meling",
+        description: "This journey begins in the rolling vineyards of Temecula, climbing through the scenic mountain twisties of San Diego County before crossing the border at the relaxed, high-altitude Tecate gate. Once in Mexico, you'll head south on Highway 3 through the world-class wineries of the Valle de Guadalupe and into the rugged ranch lands of the Sierra de San Pedro Mártir. The ride concludes at the historic Rancho Meling, a 10,000-acre working cattle ranch nestled in an oak-dotted valley at the foot of Baja's highest peaks.",
+        miles: 273,
+        ridingTime: "6 hours",
+        startPoint: "Temecula, CA",
+        endPoint: "Rancho Meling, BC",
+        accommodation: "Shared Room ($55-70 PP) or Camping ($15)",
+        accommodationType: "mixed",
+        accommodationLinks: [{name: "Rancho Meling", url: "https://ranchomeling.staydirectly.com", type: "hotel"}],
+        pointsOfInterest: [
+          "Tecate Border Crossing: Less-congested alternative to Tijuana into Baja's mountain scenery",
+          "Valle de Guadalupe: The Napa Valley of Mexico with stunning vineyard vistas",
+          "Ensenada Malecon: Vibrant waterfront boardwalk with massive Mexican flag",
+          "Hussong's Cantina: Oldest cantina in Baja (est. 1892), birthplace of the Margarita",
+          "La Bufadora: Marine geyser shooting seawater over 100 feet into the air",
+          "Ojos Negros: Traditional ranching community famous for artisanal cheeses",
+        ],
+        coordinates: {start: [33.4936, -117.1484], end: [30.9667, -115.7500]},
+        waypoints: [[32.576815, -116.627541]],
+      },
+      {
+        day: 3,
+        date: "March 21, 2026",
+        title: "Rancho Meling to Laguna Ojo de Liebre",
+        description: "Big riding day south through the Vizcaíno Desert to Guerrero Negro area. Camp at the famous Laguna Ojo de Liebre whale sanctuary where gray whales come to breed and give birth.",
+        miles: 343,
+        ridingTime: "7 hours",
+        startPoint: "Rancho Meling, BC",
+        endPoint: "Laguna Ojo de Liebre, BCS",
+        accommodation: "Rustic Camping at Whale Preserve ($15)",
+        accommodationType: "camping",
+        pointsOfInterest: [
+          "Vizcaíno Desert landscapes",
+          "28th Parallel - Baja California Sur border",
+          "Salt evaporation ponds",
+          "Laguna Ojo de Liebre whale sanctuary",
+          "Gray whale watching (seasonal)",
+        ],
+        coordinates: {start: [30.9667, -115.7500], end: [27.7500, -114.0333]},
+      },
+      {
+        day: 4,
+        date: "March 22, 2026",
+        title: "Laguna Ojo de Liebre to Playa El Burro",
+        description: "Leaving the Pacific salt flats of Ojo de Liebre, you will traverse the vast Vizcaíno Desert before ascending the volcanic switchbacks of the Cuesta del Infierno. The route then transforms into a lush river valley oasis at Mulegé, finally opening up to the jaw-dropping turquoise waters and white sand beaches of Bahía Concepción.",
+        miles: 197,
+        ridingTime: "4.25 hours",
+        startPoint: "Laguna Ojo de Liebre, BCS",
+        endPoint: "Playa El Burro, BCS",
+        accommodation: "Beach Camping at Playa El Burro",
+        accommodationType: "camping",
+        pointsOfInterest: [
+          "Guerrero Negro Salt Works: Largest sea salt evaporative pond in the world",
+          "San Ignacio Oasis: Palm-fringed town with stunning 18th-century stone mission",
+          "Volcán Las Tres Vírgenes: Towering dormant volcanoes near the Sea of Cortez",
+          "Cuesta del Infierno: Thrilling steep switchbacks dropping to the coast",
+          "Santa Rosalía: French-influenced mining town with Eiffel-designed iron church",
+          "Panaderia El Boleo: Century-old bakery famous for French-style breads",
+          "Mulegé River Overlook: Panoramic view of palm oasis meeting the sea",
+        ],
+        coordinates: {start: [27.7500, -114.0333], end: [26.729599, -111.907063]},
+      },
+      {
+        day: 5,
+        date: "March 23, 2026",
+        title: "Bahía Concepción - Rest Day",
+        description: "Rest day to explore the stunning beaches and coves of Bahía Concepción. Relax on the beach, take a short 30-minute ride into the charming town of Mulegé, or venture on a longer 90-minute ride south to the beautiful colonial town of Loreto.",
+        miles: 0,
+        ridingTime: "Rest day",
+        startPoint: "Playa El Burro, BCS",
+        endPoint: "Playa El Burro, BCS",
+        accommodation: "Beach Camping at Playa El Burro",
+        accommodationType: "camping",
+        pointsOfInterest: [
+          "Kayaking and snorkeling in crystal-clear waters",
+          "Explore nearby beaches: Playa Santispac, Playa Coyote, Playa Requeson",
+          "Visit the historic town of Mulegé (30 min ride)",
+          "Visit the town of Loreto or head up to the historic Mission San Javier",
+          "Fresh seafood at beachside palapas",
+          "Optional: Cave paintings tour at Sierra de Guadalupe",
+        ],
+        coordinates: {start: [26.729599, -111.907063], end: [26.729599, -111.907063]},
+      },
+      {
+        day: 6,
+        date: "March 24, 2026",
+        title: "Playa El Burro to Bahía de los Ángeles",
+        description: "Head north along the Sea of Cortez to the remote fishing village of Bahía de los Ángeles. This isolated bay offers incredible scenery and a true Baja adventure experience.",
+        miles: 311,
+        ridingTime: "6.5 hours",
+        startPoint: "Playa El Burro, BCS",
+        endPoint: "Bahía de los Ángeles, BC",
+        accommodation: "Camp Archelon or Los Vientos Hotel ($50-90 PP double)",
+        accommodationType: "mixed",
+        accommodationLinks: [
+          {name: "Camp Archelon", url: "https://www.campoarchelon.com/about-us/", type: "camping"},
+          {name: "Los Vientos Hotel", url: "https://www.hotelsone.com/bahia-de-los-angeles-hotels-mx/los-vientos-hotel.html", type: "hotel"},
+        ],
+        pointsOfInterest: [
+          "Coastal Highway 1 scenery",
+          "Remote desert landscapes on Highway 12",
+          "Bahía de los Ángeles bay views",
+          "Island views in the Sea of Cortez",
+          "Camp Archelon sea turtle conservation",
+        ],
+        coordinates: {start: [26.729599, -111.907063], end: [28.9500, -113.5500]},
+      },
+      {
+        day: 7,
+        date: "March 25, 2026",
+        title: "Bahía de los Ángeles to Tecate",
+        description: "Traveling via Highway 5 offers a stunningly paved alternative to the interior route, following the dramatic coastline of the Sea of Cortez through some of Baja's most pristine landscapes.",
+        miles: 390,
+        ridingTime: "7.5 hours",
+        startPoint: "Bahía de los Ángeles, BC",
+        endPoint: "Tecate, BC",
+        accommodation: "Santuario Diegueño",
+        accommodationType: "hotel",
+        accommodationLinks: [{name: "Santuario Diegueño", url: "https://santuariodiegueno.com/en/", type: "hotel"}],
+        pointsOfInterest: [
+          "Gonzaga Bay",
+          "The Puertecitos Twisties",
+          "Valley of the Giants",
+          "La Rumorosa Grade",
+          "San Felipe Malecon",
+        ],
+        coordinates: {start: [28.9500, -113.5500], end: [32.576069, -116.619630]},
+      },
+      {
+        day: 8,
+        date: "March 26, 2026",
+        title: "Tecate to Twentynine Palms",
+        description: "Crossing the border into California, you will climb through the twisty mountain pines of Julian and the sweeping vistas of the Sunrise Scenic Byway before descending into the vast Anza-Borrego Desert.",
+        miles: 200,
+        ridingTime: "4.25 hours",
+        startPoint: "Tecate, BC",
+        endPoint: "Twentynine Palms, CA",
+        accommodation: "Fairfield Inn & Suites Twentynine Palms",
+        accommodationType: "hotel",
+        accommodationLinks: [{name: "Fairfield Inn & Suites Twentynine Palms", url: "https://www.marriott.com/hotels/travel/pspfi-fairfield-inn-and-suites-twentynine-palms-joshua-tree-national-park/", type: "hotel"}],
+        pointsOfInterest: [
+          "Julian: Historic gold-mining charm and legendary apple pies",
+          "Sunrise Scenic Byway: High-elevation sweepers through Cleveland National Forest",
+          "Anza-Borrego Desert State Park: Badlands and Sky Art sculptures",
+          "Box Canyon Road: Dramatic narrow passage through colorful rock layers",
+          "Joshua Tree National Park: Rock monoliths and iconic Joshua trees",
+        ],
+        coordinates: {start: [32.576069, -116.619630], end: [34.1356, -116.0542]},
+        waypoints: [[33.076266, -116.598577]],
+      },
+      {
+        day: 9,
+        date: "March 27, 2026",
+        title: "Twentynine Palms to Furnace Creek",
+        description: "This route takes you from the high desert of Twentynine Palms into the heart of the Mojave National Preserve, where the paved road cuts through a silent, prehistoric landscape of cinder cones and vast sand dunes.",
+        miles: 240,
+        ridingTime: "4 hours",
+        startPoint: "Twentynine Palms, CA",
+        endPoint: "Furnace Creek, Death Valley",
+        accommodation: "Camping at Furnace Creek",
+        accommodationType: "camping",
+        pointsOfInterest: [
+          "Amboy Road & Ironage: Desolate desert straightaway with wide-open horizons",
+          "Kelso Depot: Restored 1924 Spanish-style train station and visitor center",
+          "Kelso Dunes: Massive singing sand dunes rising 600+ feet",
+          "Mojave Cinder Cones: Field of 30+ dormant volcanic cones and lava flows",
+          "Baker: World's Tallest Thermometer and last fuel stop before Death Valley",
+        ],
+        coordinates: {start: [34.1356, -116.0542], end: [36.4572, -116.8658]},
+      },
+    ];
+
+    try {
+      // Save to Firestore
+      const docRef = db.collection("eventConfig").doc("itinerary");
+      await docRef.set({
+        days: itineraryDays,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: request.auth?.uid,
+      });
+
+      logger.info("[BajaItinerary] Itinerary seeded", {dayCount: itineraryDays.length});
+
+      return {success: true, dayCount: itineraryDays.length};
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[BajaItinerary] Failed to seed itinerary", {error: errorMessage});
+      throw new HttpsError("internal", "Failed to seed itinerary");
+    }
+  }
+);
+
+/**
  * Send push notification to all registered devices
  * Supports both FCM (web) and Expo (native app) tokens
  */
@@ -616,6 +927,469 @@ export const sendPushNotification = onCall(
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       logger.error("[BajaPush] sendPushNotification failed", {error: errorMessage});
       throw new HttpsError("internal", "Failed to send push notification");
+    }
+  }
+);
+
+// ============================================================
+// THUMBNAIL GENERATION
+// ============================================================
+
+const THUMBNAIL_MAX_WIDTH = 400;
+const THUMBNAIL_PREFIX = "thumb_";
+
+/**
+ * Generate thumbnail when an image is uploaded to the gallery
+ * Triggers on files uploaded to gallery/bajarun2026/*
+ */
+export const generateThumbnail = onObjectFinalized(
+  {
+    memory: "512MiB",
+  },
+  async (event) => {
+    const filePath = event.data.name;
+    const contentType = event.data.contentType;
+
+    // Only process gallery uploads
+    if (!filePath || !filePath.startsWith("gallery/bajarun2026/")) {
+      logger.info("[Thumbnail] Skipping non-gallery file", {filePath});
+      return;
+    }
+
+    // Skip if already a thumbnail
+    const fileName = path.basename(filePath);
+    if (fileName.startsWith(THUMBNAIL_PREFIX)) {
+      logger.info("[Thumbnail] Skipping thumbnail file", {filePath});
+      return;
+    }
+
+    // Only process images
+    if (!contentType || !contentType.startsWith("image/")) {
+      logger.info("[Thumbnail] Skipping non-image file", {filePath, contentType});
+      return;
+    }
+
+    logger.info("[Thumbnail] Processing image", {filePath, contentType});
+
+    const bucket = admin.storage().bucket(event.data.bucket);
+    const fileDir = path.dirname(filePath);
+    const fileExtension = path.extname(filePath);
+    const fileNameWithoutExt = path.basename(filePath, fileExtension);
+
+    // Paths
+    const tempFilePath = path.join(os.tmpdir(), fileName);
+    const thumbnailFileName = `${THUMBNAIL_PREFIX}${fileNameWithoutExt}.webp`;
+    const tempThumbPath = path.join(os.tmpdir(), thumbnailFileName);
+    const thumbStoragePath = path.join(fileDir, thumbnailFileName);
+
+    try {
+      // Download original to temp
+      await bucket.file(filePath).download({destination: tempFilePath});
+      logger.info("[Thumbnail] Downloaded original", {tempFilePath});
+
+      // Generate thumbnail with sharp
+      await sharp(tempFilePath)
+        .resize(THUMBNAIL_MAX_WIDTH, null, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({quality: 80})
+        .toFile(tempThumbPath);
+
+      logger.info("[Thumbnail] Generated thumbnail", {tempThumbPath});
+
+      // Upload thumbnail
+      await bucket.upload(tempThumbPath, {
+        destination: thumbStoragePath,
+        metadata: {
+          contentType: "image/webp",
+          metadata: {
+            originalFile: filePath,
+          },
+        },
+      });
+
+      // Get signed URL for thumbnail (valid for 10 years)
+      const [thumbnailUrl] = await bucket.file(thumbStoragePath).getSignedUrl({
+        action: "read",
+        expires: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000,
+      });
+
+      logger.info("[Thumbnail] Uploaded thumbnail", {thumbStoragePath, thumbnailUrl});
+
+      // Update Firestore document with thumbnail URL
+      // Find the document by matching the storage filename
+      const db = admin.firestore();
+      const mediaRef = db.collection("events").doc("bajarun2026").collection("media");
+
+      // Query for documents that match this file (by checking if url contains the filename)
+      const querySnapshot = await mediaRef.get();
+      let updatedCount = 0;
+
+      for (const docSnapshot of querySnapshot.docs) {
+        const data = docSnapshot.data();
+        // Match by filename pattern in URL
+        if (data.url && data.url.includes(fileNameWithoutExt)) {
+          await docSnapshot.ref.update({
+            thumbnailUrl: thumbnailUrl,
+            thumbnailGenerated: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          updatedCount++;
+          logger.info("[Thumbnail] Updated Firestore document", {docId: docSnapshot.id});
+        }
+      }
+
+      if (updatedCount === 0) {
+        logger.warn("[Thumbnail] No matching Firestore document found", {fileName});
+      }
+
+      // Cleanup temp files
+      fs.unlinkSync(tempFilePath);
+      fs.unlinkSync(tempThumbPath);
+
+      logger.info("[Thumbnail] Generation complete", {
+        original: filePath,
+        thumbnail: thumbStoragePath,
+        updatedDocs: updatedCount,
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[Thumbnail] Generation failed", {filePath, error: errorMessage});
+
+      // Cleanup temp files on error
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+      if (fs.existsSync(tempThumbPath)) {
+        fs.unlinkSync(tempThumbPath);
+      }
+    }
+  }
+);
+
+// ============================================================
+// STRIPE PAYMENTS
+// ============================================================
+
+interface CartItem {
+  productId: string;
+  name: string;
+  price: number; // in cents
+  quantity: number;
+  variant?: string; // size, duration, etc.
+}
+
+interface CreatePaymentIntentData {
+  items: CartItem[];
+  customerEmail?: string;
+  shippingRequired?: boolean;
+}
+
+/**
+ * Create a Stripe PaymentIntent for the store
+ * Returns the client secret for the mobile payment sheet
+ */
+export const createPaymentIntent = onCall(
+  {
+    secrets: [stripeSecretKey],
+  },
+  async (request) => {
+    // Require authentication
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in to make a purchase.");
+    }
+
+    const {items, customerEmail, shippingRequired} = request.data as CreatePaymentIntentData;
+
+    // Validate items
+    if (!items || items.length === 0) {
+      throw new HttpsError("invalid-argument", "Cart is empty.");
+    }
+
+    logger.info("[Stripe] Creating PaymentIntent", {
+      uid: request.auth.uid,
+      itemCount: items.length,
+      customerEmail,
+    });
+
+    try {
+      // Initialize Stripe
+      const stripe = new Stripe(stripeSecretKey.value(), {
+        apiVersion: "2025-12-15.clover",
+      });
+
+      // Calculate total (items already have price in cents)
+      const amount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+      if (amount < 50) {
+        throw new HttpsError("invalid-argument", "Minimum order amount is $0.50.");
+      }
+
+      // Create PaymentIntent
+      const email = customerEmail || request.auth.token.email || "";
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: "usd",
+        receipt_email: email || undefined,
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        metadata: {
+          uid: request.auth.uid,
+          email: email,
+          items: JSON.stringify(items.map((i) => ({
+            id: i.productId,
+            name: i.name,
+            qty: i.quantity,
+            variant: i.variant,
+          }))),
+        },
+      });
+
+      logger.info("[Stripe] PaymentIntent created", {
+        id: paymentIntent.id,
+        amount,
+      });
+
+      // Save order to Firestore (pending status)
+      const db = admin.firestore();
+      await db.collection("orders").doc(paymentIntent.id).set({
+        uid: request.auth.uid,
+        email: customerEmail || request.auth.token.email || "",
+        items,
+        amount,
+        status: "pending",
+        shippingRequired: shippingRequired || false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount,
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[Stripe] createPaymentIntent failed", {error: errorMessage});
+      throw new HttpsError("internal", "Failed to create payment. Please try again.");
+    }
+  }
+);
+
+/**
+ * Confirm order after successful payment
+ * Called by the app after payment sheet returns success
+ */
+export const confirmOrder = onCall(
+  {
+    secrets: [stripeSecretKey],
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+
+    const {paymentIntentId, shippingAddress} = request.data as {
+      paymentIntentId: string;
+      shippingAddress?: {
+        name: string;
+        line1: string;
+        line2?: string;
+        city: string;
+        state: string;
+        postalCode: string;
+      };
+    };
+
+    if (!paymentIntentId) {
+      throw new HttpsError("invalid-argument", "Payment ID required.");
+    }
+
+    logger.info("[Stripe] Confirming order", {
+      uid: request.auth.uid,
+      paymentIntentId,
+    });
+
+    try {
+      // Verify payment with Stripe
+      const stripe = new Stripe(stripeSecretKey.value(), {
+        apiVersion: "2025-12-15.clover",
+      });
+
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+      if (paymentIntent.status !== "succeeded") {
+        throw new HttpsError("failed-precondition", "Payment not completed.");
+      }
+
+      // Update order in Firestore
+      const db = admin.firestore();
+      await db.collection("orders").doc(paymentIntentId).update({
+        status: "paid",
+        shippingAddress: shippingAddress || null,
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      logger.info("[Stripe] Order confirmed", {paymentIntentId});
+
+      return {success: true, orderId: paymentIntentId};
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[Stripe] confirmOrder failed", {error: errorMessage});
+      throw new HttpsError("internal", "Failed to confirm order.");
+    }
+  }
+);
+
+/**
+ * Seed store products to Firestore
+ * Admin-only function to populate products collection
+ */
+export const seedProducts = onCall(
+  async (request) => {
+    requireAdmin(request.auth);
+
+    const db = admin.firestore();
+
+    const products = [
+      {
+        name: "Baseball Hat",
+        description: "Classic NorCal Moto Adventure cap with embroidered logo",
+        price: 2000,
+        imageUrl: "https://firebasestorage.googleapis.com/v0/b/bajarun-2026.firebasestorage.app/o/products%2Fhat.png?alt=media",
+        category: "apparel",
+        inStock: true,
+        featured: true,
+      },
+      {
+        name: "T-Shirt",
+        description: "Comfortable cotton tee with tour graphic",
+        price: 2000,
+        imageUrl: "https://firebasestorage.googleapis.com/v0/b/bajarun-2026.firebasestorage.app/o/products%2Fshirt.png?alt=media",
+        category: "apparel",
+        variants: [
+          {id: "S", name: "Small"},
+          {id: "M", name: "Medium"},
+          {id: "L", name: "Large"},
+          {id: "XL", name: "X-Large"},
+        ],
+        inStock: true,
+      },
+      {
+        name: "Riding Jersey",
+        description: "Moisture-wicking adventure jersey with tour branding",
+        price: 8000,
+        imageUrl: "https://firebasestorage.googleapis.com/v0/b/bajarun-2026.firebasestorage.app/o/products%2Fjersey.png?alt=media",
+        category: "apparel",
+        variants: [
+          {id: "S", name: "Small"},
+          {id: "M", name: "Medium"},
+          {id: "L", name: "Large"},
+          {id: "XL", name: "X-Large"},
+        ],
+        inStock: true,
+      },
+      {
+        name: "Camping Gear Rental - Weekend",
+        description: "Tent, sleeping bag, and pad for a weekend adventure",
+        price: 2500,
+        imageUrl: "https://firebasestorage.googleapis.com/v0/b/bajarun-2026.firebasestorage.app/o/products%2FCamping%20Gear.png?alt=media",
+        category: "gear",
+        inStock: true,
+      },
+      {
+        name: "Camping Gear Rental - Week",
+        description: "Tent, sleeping bag, and pad for a full week",
+        price: 5000,
+        imageUrl: "https://firebasestorage.googleapis.com/v0/b/bajarun-2026.firebasestorage.app/o/products%2FCamping%20Gear.png?alt=media",
+        category: "gear",
+        inStock: true,
+      },
+      {
+        name: "Custom Trip Planning",
+        description: "Routes, campgrounds, hotels, GPX files + two 30-min consultations",
+        price: 10000,
+        imageUrl: "https://firebasestorage.googleapis.com/v0/b/bajarun-2026.firebasestorage.app/o/products%2Fcustom.jpeg?alt=media",
+        category: "service",
+        inStock: true,
+        featured: true,
+      },
+    ];
+
+    try {
+      const batch = db.batch();
+
+      for (const product of products) {
+        const docRef = db.collection("products").doc();
+        batch.set(docRef, {
+          ...product,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      logger.info("[Store] Products seeded", {count: products.length});
+
+      return {success: true, count: products.length};
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[Store] Failed to seed products", {error: errorMessage});
+      throw new HttpsError("internal", "Failed to seed products");
+    }
+  }
+);
+
+// ============================================================
+// TOURS MANAGEMENT
+// ============================================================
+
+/**
+ * Seed tours collection with available tours
+ * Admin-only function to populate tours collection
+ */
+export const seedTours = onCall(
+  async (request) => {
+    requireAdmin(request.auth);
+
+    const db = admin.firestore();
+
+    const tours = [
+      {
+        id: "bajarun2026",
+        name: "Baja Run 2026",
+        description: "Epic 9-day motorcycle adventure through Baja California. From Temecula to Death Valley via the stunning beaches and deserts of Mexico.",
+        imageUrl: "https://firebasestorage.googleapis.com/v0/b/bajarun-2026.firebasestorage.app/o/tours%2Fbaja-2026.jpg?alt=media",
+        startDate: admin.firestore.Timestamp.fromDate(new Date("2026-03-19")),
+        endDate: admin.firestore.Timestamp.fromDate(new Date("2026-03-27")),
+        status: "open",
+        registrationOpen: true,
+        maxParticipants: 20,
+        depositAmount: 500,
+      },
+    ];
+
+    try {
+      const batch = db.batch();
+
+      for (const tour of tours) {
+        const docRef = db.collection("tours").doc(tour.id);
+        batch.set(docRef, {
+          ...tour,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      logger.info("[Tours] Tours seeded", {count: tours.length});
+
+      return {success: true, count: tours.length};
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error("[Tours] Failed to seed tours", {error: errorMessage});
+      throw new HttpsError("internal", "Failed to seed tours");
     }
   }
 );

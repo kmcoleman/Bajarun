@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { formatPhoneNumber } from '../utils/formatters';
 import {
   User,
   Bike,
@@ -267,18 +268,6 @@ export default function MyProfilePage() {
   const updateField = (field: keyof RegistrationData, value: string | boolean) => {
     if (editData) {
       setEditData({ ...editData, [field]: value });
-    }
-  };
-
-  // Format phone number
-  const formatPhoneNumber = (value: string): string => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.length <= 3) {
-      return digits.length > 0 ? `(${digits}` : '';
-    } else if (digits.length <= 6) {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-    } else {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     }
   };
 

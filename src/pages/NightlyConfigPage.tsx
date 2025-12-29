@@ -6,8 +6,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AdminLayout from '../components/AdminLayout';
 import {
   Hotel,
   Tent,
@@ -21,12 +21,10 @@ import {
   MapPin,
   DollarSign,
   Check,
-  AlertCircle,
   UserRound,
   Compass,
   Plus,
   Trash2,
-  ArrowLeft,
   Route,
   Fuel,
   Mountain,
@@ -210,42 +208,19 @@ export default function NightlyConfigPage() {
   // Auth loading
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
-      </div>
-    );
-  }
-
-  // Not admin
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-slate-400">You don't have permission to access this page.</p>
+      <AdminLayout title="Daily Configuration">
+        <div className="flex items-center justify-center min-h-[40vh]">
+          <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link
-              to="/admin"
-              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 text-white" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Daily Configuration</h1>
-              <p className="text-slate-400 mt-1">Configure accommodations and meals for each night</p>
-            </div>
-          </div>
+    <AdminLayout title="Daily Configuration">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <p className="text-slate-400">Configure accommodations and meals for each night</p>
           <button
             onClick={handleSave}
             disabled={saving || !hasChanges}
@@ -1238,7 +1213,6 @@ export default function NightlyConfigPage() {
             {saving ? 'Saving...' : 'Save Configuration'}
           </button>
         </div>
-      </div>
-    </div>
+    </AdminLayout>
   );
 }

@@ -40,7 +40,7 @@ const guideSections: GuideSection[] = [
     icon: <UserPlus className="h-6 w-6" />,
     description: 'Create an account and register for the tour to access all features.',
     steps: [
-      'Click "Join the Tour" in the top right corner',
+      'Click "Login" in the top right corner',
       'Sign in with Google or create an account with email/password',
       'Complete the registration form with your personal info, emergency contact, and motorcycle details',
       'Submit your deposit via Venmo or Zelle to secure your spot'

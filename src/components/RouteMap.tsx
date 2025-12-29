@@ -9,9 +9,24 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { itineraryData, type DayItinerary } from '../data/itinerary';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import type { POI, RouteConfig } from '../types/routeConfig';
+import { POI_CATEGORIES } from '../types/routeConfig';
 
 // Mapbox access token - set in environment variable
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
+
+// POI category colors for markers
+const POI_COLORS: Record<string, string> = {
+  gas: '#facc15',      // yellow-400
+  restaurant: '#fb923c', // orange-400
+  poi: '#3b82f6',      // blue-500
+  viewpoint: '#22c55e', // green-500
+  photo: '#a855f7',    // purple-500
+  border: '#ef4444',   // red-500
+  emergency: '#dc2626', // red-600
+};
 
 interface RouteMapProps {
   onDayClick?: (day: number) => void;
@@ -22,12 +37,158 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const poiMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [allPOIs, setAllPOIs] = useState<Array<POI & { dayNumber: number }>>([]);
 
   // Check if token is available
   const hasToken = !!mapboxgl.accessToken;
+
+  // Load POIs from all days (public access)
+  useEffect(() => {
+    async function loadAllPOIs() {
+      console.log('Loading POIs from Firestore...');
+      try {
+        const routesRef = collection(db, 'events', 'bajarun2026', 'routes');
+        const snapshot = await getDocs(routesRef);
+        const pois: Array<POI & { dayNumber: number }> = [];
+
+        console.log('Found', snapshot.size, 'route documents');
+
+        snapshot.forEach((doc) => {
+          const dayMatch = doc.id.match(/day(\d+)/);
+          if (dayMatch) {
+            const dayNum = parseInt(dayMatch[1], 10);
+            const routeConfig = doc.data() as RouteConfig;
+            if (routeConfig.pois && routeConfig.pois.length > 0) {
+              console.log('Day', dayNum, 'has', routeConfig.pois.length, 'POIs');
+              routeConfig.pois.forEach(poi => {
+                if (poi.coordinates?.lat && poi.coordinates?.lng) {
+                  pois.push({ ...poi, dayNumber: dayNum });
+                }
+              });
+            }
+          }
+        });
+
+        console.log('Total POIs loaded:', pois.length);
+        setAllPOIs(pois);
+      } catch (error) {
+        console.error('Error loading POIs:', error);
+      }
+    }
+
+    loadAllPOIs();
+  }, []);
+
+  // Add POI markers when map is loaded and POIs are available
+  useEffect(() => {
+    console.log('POI marker effect - mapLoaded:', mapLoaded, 'POIs:', allPOIs.length, 'map:', !!map.current);
+    if (!map.current || !mapLoaded || allPOIs.length === 0) return;
+
+    console.log('Adding', allPOIs.length, 'POI markers to map');
+
+    // Clear existing POI markers
+    poiMarkersRef.current.forEach(marker => marker.remove());
+    poiMarkersRef.current = [];
+
+    // Add POI markers
+    allPOIs.forEach(poi => {
+      addPOIMarker(poi);
+    });
+
+    console.log('POI markers added:', poiMarkersRef.current.length);
+  }, [mapLoaded, allPOIs]);
+
+  // Add POI marker with category-specific styling
+  const addPOIMarker = (poi: POI & { dayNumber: number }) => {
+    if (!map.current) return;
+
+    const categoryConfig = POI_CATEGORIES.find(c => c.value === poi.category);
+    const color = POI_COLORS[poi.category] || POI_COLORS.poi;
+
+    // Create marker element with category color
+    const el = document.createElement('div');
+    el.className = 'poi-marker';
+    el.innerHTML = `
+      <div style="
+        width: 20px;
+        height: 20px;
+        background: ${color};
+        border: 2px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        cursor: pointer;
+      ">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          ${getIconPath(poi.category)}
+        </svg>
+      </div>
+    `;
+
+    // Build popup content
+    let popupHtml = `
+      <div style="padding: 8px; font-family: system-ui; max-width: 220px;">
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="
+            display: inline-block;
+            padding: 1px 6px;
+            background: ${color};
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: 3px;
+            text-transform: uppercase;
+          ">${categoryConfig?.label || 'POI'}</span>
+          <span style="font-size: 10px; color: #888;">Day ${poi.dayNumber}</span>
+        </div>
+        <strong style="font-size: 13px; display: block; margin-bottom: 2px;">${poi.name}</strong>
+    `;
+
+    if (poi.description) {
+      popupHtml += `<p style="font-size: 11px; color: #555; margin: 0;">${poi.description}</p>`;
+    }
+
+    popupHtml += `</div>`;
+
+    const popup = new mapboxgl.Popup({
+      offset: 15,
+      closeButton: false,
+      maxWidth: '240px'
+    }).setHTML(popupHtml);
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([poi.coordinates.lng, poi.coordinates.lat])
+      .setPopup(popup)
+      .addTo(map.current);
+
+    poiMarkersRef.current.push(marker);
+  };
+
+  // Get SVG path for POI category icon
+  const getIconPath = (category: string): string => {
+    switch (category) {
+      case 'gas':
+        return '<path d="M3 22V5a2 2 0 012-2h6a2 2 0 012 2v17"/><path d="M14 10h2a2 2 0 012 2v2a2 2 0 002 2h0a2 2 0 002-2V9.83a2 2 0 00-.59-1.42L18 5"/>';
+      case 'restaurant':
+        return '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>';
+      case 'viewpoint':
+        return '<path d="M8 3l4 8 5-5 5 15H2L8 3z"/>';
+      case 'photo':
+        return '<path d="M14.5 4h-5L7 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>';
+      case 'border':
+        return '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>';
+      case 'emergency':
+        return '<path d="M12 2v20M2 12h20"/>';
+      default: // poi / mappin
+        return '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>';
+    }
+  };
 
   useEffect(() => {
     if (!hasToken || !mapContainer.current || map.current) return;
@@ -60,9 +221,13 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
     }
 
     return () => {
-      // Clean up markers
+      // Clean up day markers
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
+
+      // Clean up POI markers
+      poiMarkersRef.current.forEach(marker => marker.remove());
+      poiMarkersRef.current = [];
 
       // Clean up map
       if (map.current) {
@@ -258,7 +423,7 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
   // Show placeholder if no token
   if (!hasToken) {
     return (
-      <div className="h-64 md:h-96 bg-slate-900 flex items-center justify-center rounded-xl">
+      <div className="h-full min-h-[300px] bg-slate-900 flex items-center justify-center rounded-xl">
         <div className="text-center text-slate-400 p-6">
           <p className="text-lg font-medium mb-2">Map requires Mapbox API key</p>
           <p className="text-sm mb-4">Add VITE_MAPBOX_TOKEN to your .env file</p>
@@ -278,7 +443,7 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
   // Show error state
   if (mapError) {
     return (
-      <div className="h-64 md:h-96 bg-slate-900 flex items-center justify-center rounded-xl">
+      <div className="h-full min-h-[300px] bg-slate-900 flex items-center justify-center rounded-xl">
         <div className="text-center text-red-400 p-6">
           <p className="text-lg font-medium">{mapError}</p>
         </div>
@@ -287,10 +452,10 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
       <div
         ref={mapContainer}
-        className="h-64 md:h-96 rounded-xl overflow-hidden"
+        className="h-full min-h-[300px] rounded-xl overflow-hidden"
       />
       {!mapLoaded && (
         <div className="absolute inset-0 bg-slate-900 flex items-center justify-center rounded-xl">

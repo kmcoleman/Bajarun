@@ -3,7 +3,7 @@
  * Adapted from PWA version.
  */
 
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   getData,
@@ -77,6 +77,61 @@ export interface RiderDocuments {
   fmmPaymentReceipt?: DocumentInfo;
   mexicoInsurance?: DocumentInfo;
   americanInsurance?: DocumentInfo;
+}
+
+// Itinerary types
+export interface AccommodationLink {
+  name: string;
+  url: string;
+  type: 'camping' | 'hotel';
+}
+
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+export interface POI {
+  id: string;
+  name: string;
+  coordinates: Coordinates;
+  category: 'gas' | 'restaurant' | 'poi' | 'viewpoint' | 'photo' | 'border' | 'emergency';
+  description: string;
+  phone?: string;
+  hours?: string;
+}
+
+export interface RouteConfig {
+  startCoordinates: Coordinates;
+  startName: string;
+  endCoordinates: Coordinates;
+  endName: string;
+  waypoints: Coordinates[];
+  pois: POI[];
+  estimatedDistance?: number;
+  estimatedTime?: string;
+}
+
+export interface DayItinerary {
+  day: number;
+  date: string;
+  title: string;
+  description: string;
+  miles: number;
+  ridingTime: string;
+  startPoint: string;
+  endPoint: string;
+  accommodation: string;
+  accommodationType: 'hotel' | 'camping' | 'mixed';
+  accommodationLinks?: AccommodationLink[];
+  pointsOfInterest: string[];
+  coordinates: {
+    start: [number, number];
+    end: [number, number];
+  };
+  waypoints?: [number, number][];
+  // Extended fields from Firestore NightConfig
+  routeConfig?: RouteConfig;
 }
 
 // Sync all data from Firestore
@@ -246,14 +301,16 @@ async function syncAnnouncements(): Promise<void> {
   }
 }
 
-// Sync user's rider documents metadata
+// Sync user's rider documents metadata from registrations collection
 async function syncUserDocuments(userId: string): Promise<void> {
   try {
-    const docRef = doc(db, 'users', userId);
-    const docSnap = await getDoc(docRef);
+    // Find user's registration by uid
+    const registrationsRef = collection(db, 'registrations');
+    const q = query(registrationsRef, where('uid', '==', userId));
+    const snapshot = await getDocs(q);
 
-    if (docSnap.exists()) {
-      const data = docSnap.data();
+    if (!snapshot.empty) {
+      const data = snapshot.docs[0].data();
       if (data.riderDocuments) {
         await setData(STORAGE_KEYS.RIDER_DOCUMENTS, data.riderDocuments);
         console.log('Synced rider documents metadata');

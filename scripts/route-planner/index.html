@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baja Route Planner</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h1>Baja Route Planner</h1>
+
+      <!-- Route Section -->
+      <section class="section">
+        <h2>Route</h2>
+        <div class="form-group">
+          <label>Start Location</label>
+          <input type="text" id="startInput" placeholder="e.g., Mulegé, Mexico">
+        </div>
+        <div class="form-group">
+          <label>End Location</label>
+          <input type="text" id="endInput" placeholder="e.g., Bahía de los Ángeles, Mexico">
+        </div>
+        <button id="setRouteBtn" class="btn btn-primary">Set Route</button>
+        <div id="routeInfo" class="route-info" style="display: none;">
+          <span id="routeDistance"></span> &bull; <span id="routeDuration"></span>
+        </div>
+      </section>
+
+      <!-- Discover Section -->
+      <section class="section">
+        <h2>Discover Along Route</h2>
+        <div class="discover-buttons">
+          <button class="btn btn-discover" data-query="gas station">Gas Stations</button>
+          <button class="btn btn-discover" data-query="restaurant">Restaurants</button>
+          <button class="btn btn-discover" data-query="scenic spot">Scenic Spots</button>
+        </div>
+        <div id="searchResults" class="search-results" style="display: none;">
+          <div class="results-header">
+            <span id="resultsCount">0 results</span>
+            <button id="clearResultsBtn" class="btn btn-small">Clear</button>
+          </div>
+          <div id="resultsList"></div>
+        </div>
+      </section>
+
+      <!-- Add Waypoint Section -->
+      <section class="section">
+        <h2>Add Waypoint from URL</h2>
+        <div class="form-group">
+          <input type="text" id="waypointUrlInput" placeholder="Paste Google Maps URL for waypoint">
+        </div>
+        <button id="addWaypointFromUrlBtn" class="btn btn-primary" style="width: 100%;">Add Waypoint</button>
+        <small class="hint">Add waypoints in order from start to end</small>
+      </section>
+
+      <!-- Quick Add POI Section -->
+      <section class="section">
+        <h2>Add POI from URL</h2>
+        <div class="form-group">
+          <input type="text" id="urlInput" placeholder="Paste Google Maps URL">
+        </div>
+        <div class="form-row">
+          <select id="urlCategory">
+            <option value="gas">Gas Station</option>
+            <option value="restaurant">Restaurant</option>
+            <option value="poi">Point of Interest</option>
+            <option value="viewpoint">Viewpoint</option>
+            <option value="photo">Photo Spot</option>
+            <option value="border">Border</option>
+            <option value="emergency">Emergency</option>
+          </select>
+          <button id="addFromUrlBtn" class="btn btn-primary">Add</button>
+        </div>
+      </section>
+
+      <!-- Route Items Section -->
+      <section class="section">
+        <h2>Route Items</h2>
+        <div id="routeItems" class="route-items">
+          <p class="empty-message">Set a route to begin</p>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <section class="section actions">
+        <button id="importBtn" class="btn btn-secondary">Import JSON</button>
+        <button id="exportBtn" class="btn btn-primary">Export JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display: none;">
+      </section>
+    </div>
+
+    <!-- Map -->
+    <div class="map-container">
+      <div id="map"></div>
+      <div id="mapInstructions" class="map-instructions">
+        Click on the map to add a waypoint
+      </div>
+    </div>
+  </div>
+
+  <!-- POI Editor Modal -->
+  <div id="poiModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h3 id="modalTitle">Add POI</h3>
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" id="poiName" required>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="poiCategory">
+          <option value="gas">Gas Station</option>
+          <option value="restaurant">Restaurant</option>
+          <option value="poi">Point of Interest</option>
+          <option value="viewpoint">Viewpoint</option>
+          <option value="photo">Photo Spot</option>
+          <option value="border">Border</option>
+          <option value="emergency">Emergency</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="poiDescription" rows="2"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex: 1;">
+          <label>Phone</label>
+          <input type="text" id="poiPhone">
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <label>Hours</label>
+          <input type="text" id="poiHours" placeholder="e.g., 8am-6pm">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Coordinates</label>
+        <div class="form-row">
+          <input type="number" id="poiLat" step="0.0001" placeholder="Latitude" style="flex: 1;">
+          <input type="number" id="poiLng" step="0.0001" placeholder="Longitude" style="flex: 1;">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelPoiBtn" class="btn btn-secondary">Cancel</button>
+        <button id="savePoiBtn" class="btn btn-primary">Save</button>
+      </div>
+      <input type="hidden" id="poiEditId">
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -8,7 +8,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User,
   Bike,
@@ -28,6 +28,7 @@ import {
 import { db, storage } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { formatPhoneNumber } from '../utils/formatters';
 
 interface FormData {
   // Personal Info
@@ -128,9 +129,14 @@ const initialFormData: FormData = {
   anythingElse: ''
 };
 
+// Valid invite token for registration access
+const VALID_INVITE_TOKEN = 'baja2026';
+
 export default function RegisterPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite');
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -259,18 +265,6 @@ export default function RegisterPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Format phone number as user types: (555) 123-4567
-  const formatPhoneNumber = (value: string): string => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.length <= 3) {
-      return digits.length > 0 ? `(${digits}` : '';
-    } else if (digits.length <= 6) {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-    } else {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
-    }
-  };
-
   const handlePhoneChange = (field: 'phone' | 'emergencyPhone', value: string) => {
     const formatted = formatPhoneNumber(value);
     updateField(field, formatted);
@@ -374,6 +368,32 @@ export default function RegisterPage() {
           <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center">
             <Loader2 className="h-12 w-12 text-blue-400 animate-spin mx-auto mb-4" />
             <p className="text-slate-400">Loading registration...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Registration requires invite token (unless user already has a registration)
+  if (!existingRegistrationId && inviteToken !== VALID_INVITE_TOKEN) {
+    return (
+      <div className="min-h-screen py-16">
+        <div className="max-w-md mx-auto px-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center">
+            <div className="w-16 h-16 bg-amber-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Shield className="h-8 w-8 text-amber-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-3">Registration Closed</h1>
+            <p className="text-slate-400 mb-6">
+              Registration for the Baja 2026 Tour is currently closed.
+              If you'd like to be notified when spots open up, please join our waitlist.
+            </p>
+            <button
+              onClick={() => navigate('/waitlist')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              Join Waitlist
+            </button>
           </div>
         </div>
       </div>

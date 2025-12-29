@@ -411,10 +411,10 @@ export default function DayRouteMap({
   }
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
       <div
         ref={mapContainer}
-        className="rounded-xl overflow-hidden aspect-square"
+        className="rounded-xl overflow-hidden h-full min-h-[400px]"
       />
       {!mapLoaded && (
         <div

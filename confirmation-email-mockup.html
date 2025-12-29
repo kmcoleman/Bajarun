@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Baja Tour 2026 - Update and Rider Info Confirmation</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+    }
+    .header p {
+      margin: 0;
+      opacity: 0.9;
+      font-size: 14px;
+    }
+    .content {
+      padding: 30px;
+    }
+    .greeting {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .section {
+      margin-bottom: 25px;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e3a5f;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 8px;
+      margin-bottom: 15px;
+    }
+    .update-box {
+      background-color: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 25px;
+    }
+    .update-box h3 {
+      margin: 0 0 12px 0;
+      color: #166534;
+      font-size: 16px;
+    }
+    .update-box p {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: #374151;
+    }
+    .update-box p:last-child {
+      margin-bottom: 0;
+    }
+    .update-box a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+    .highlight-box {
+      background-color: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 25px;
+    }
+    .highlight-box h3 {
+      margin: 0 0 12px 0;
+      color: #92400e;
+      font-size: 16px;
+    }
+    .highlight-box p {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: #374151;
+    }
+    .highlight-box p:last-child {
+      margin-bottom: 0;
+    }
+    .info-box {
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 25px;
+    }
+    .info-box h3 {
+      margin: 0 0 12px 0;
+      color: #1e40af;
+      font-size: 16px;
+    }
+    .info-box p {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: #374151;
+    }
+    .info-box p:last-child {
+      margin-bottom: 0;
+    }
+    .info-box a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+    .event-card {
+      background-color: #faf5ff;
+      border: 1px solid #e9d5ff;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+    .event-card h4 {
+      margin: 0 0 8px 0;
+      color: #7c3aed;
+      font-size: 14px;
+    }
+    .event-card p {
+      margin: 0;
+      font-size: 13px;
+      color: #374151;
+    }
+    .event-card a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+    .app-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    .app-feature-icon {
+      flex-shrink: 0;
+      width: 20px;
+      text-align: center;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 8px 15px;
+    }
+    .label {
+      font-weight: 500;
+      color: #6b7280;
+      font-size: 13px;
+    }
+    .value {
+      color: #111827;
+      font-size: 14px;
+    }
+    .night-card {
+      background-color: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+    .night-header {
+      font-weight: 600;
+      color: #1e3a5f;
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+    .night-location {
+      color: #6b7280;
+      font-size: 13px;
+      margin-left: 5px;
+    }
+    .night-details {
+      font-size: 13px;
+      color: #374151;
+    }
+    .night-details .item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-hotel {
+      background-color: #dbeafe;
+      color: #1d4ed8;
+    }
+    .badge-camping {
+      background-color: #d1fae5;
+      color: #059669;
+    }
+    .badge-own {
+      background-color: #e5e7eb;
+      color: #4b5563;
+    }
+    .badge-meal {
+      background-color: #fef3c7;
+      color: #b45309;
+    }
+    .badge-activity {
+      background-color: #d1fae5;
+      color: #047857;
+    }
+    .preferences-box {
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+    .preferences-box h4 {
+      margin: 0 0 10px 0;
+      color: #1e40af;
+      font-size: 14px;
+    }
+    .footer {
+      background-color: #f9fafb;
+      padding: 20px 30px;
+      text-align: center;
+      font-size: 12px;
+      color: #6b7280;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Baja Tour 2026</h1>
+      <p>Tour Update & Rider Information Confirmation</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <p class="greeting">Hi <strong>Mike</strong>,</p>
+
+      <p>Happy New Year! I wanted to share some updates on our tour planning and confirm your registration details.</p>
+
+      <!-- Planning Update -->
+      <div class="update-box">
+        <h3>Planning Update</h3>
+        <p>I have reserved our rooms at <strong>Rancho Meling</strong> and <strong>Bahia de los Angeles</strong> and should be able to accommodate everyone's room preferences. I know you will really enjoy both of these locations.</p>
+        <p>I have also reserved the <strong>Indian Cove Campground</strong> and hotel in <strong>Twentynine Palms</strong>. The Indian Cove Campground is one of my favorite campgrounds and sure to provide a memorable night.</p>
+        <p>I will be finalizing the Temecula and Tecate reservations soon. What this means is that everyone is locked in and your deposits are committed for these locations.</p>
+        <p>With the core reservations taken care of, I am turning my attention to the routes, activities, and meals. I have the core routes mapped out with gas stations, restaurants, and POIs on the maps. You can check out the current itinerary at <a href="https://bajarun.ncmotoadv.com/itinerary">bajarun.ncmotoadv.com/itinerary</a>.</p>
+      </div>
+
+      <!-- Our Group -->
+      <div class="info-box">
+        <h3>Our Group</h3>
+        <p>We have <strong>30 riders</strong> signed up, one with a pillion, so <strong>31 total individuals</strong>. I know most of the riders and we have a great group for our Baja adventure. I'm sure it will provide a great experience and lasting memories.</p>
+        <p>About the group size: While 30 riders is a large group, what happens is we organically break up into smaller groups of riders who ride at their own pace and make stops along the way. So it's not a group of 30 riders in a conga line! We connect up each night, share a campfire and meal, then do it again the next day.</p>
+      </div>
+
+      <!-- Deposit Payments -->
+      <div class="highlight-box">
+        <h3>Deposit Payments</h3>
+        <p>Based on your selections, you may be over the $500 deposit amount. Once I finalize the costs of the meals and exact cost of the hotels, I will send requests for additional deposits if necessary.</p>
+      </div>
+
+      <!-- WhatsApp -->
+      <div class="info-box">
+        <h3>WhatsApp Group</h3>
+        <p>I have set up a group chat and community on WhatsApp and <strong>15 of our 30 riders</strong> have joined so far. I would encourage everyone to set up WhatsApp and join the group chat as it greatly facilitates communication of time-sensitive or important updates while on the ride.</p>
+        <p>If you haven't joined yet, please reply to this email and I'll send you the invite link.</p>
+      </div>
+
+      <!-- Upcoming Events -->
+      <div class="section">
+        <div class="section-title">Upcoming Events</div>
+
+        <div class="event-card">
+          <h4>Ride Briefing - January 7, 2026</h4>
+          <p><strong>Wednesday, January 7th at 7:30 PM Pacific</strong></p>
+          <p>Join us to review the plan and discuss any questions you have.</p>
+          <p>Google Meet: <a href="https://meet.google.com/vxf-seuq-ozc">meet.google.com/vxf-seuq-ozc</a></p>
+          <p style="margin-top: 8px; font-size: 12px; color: #6b7280;">I will record it in case you can't make this time.</p>
+        </div>
+
+        <div class="event-card">
+          <h4>Final Details Session - Early March 2026</h4>
+          <p>We'll cover the important points about FMM cards, Mexico insurance, prepping your bike, what to pack, and more.</p>
+        </div>
+      </div>
+
+      <!-- Mobile App -->
+      <div class="section">
+        <div class="section-title">Mobile App Coming Soon</div>
+        <p style="margin-bottom: 15px; font-size: 14px;">The Baja Tour 2026 mobile app will be released soon - first on iOS, then on Android. Here's what you'll be able to do:</p>
+
+        <div class="app-feature">
+          <span class="app-feature-icon">&#128506;</span>
+          <span><strong>GPS Routes & Navigation</strong> - Follow the daily routes with turn-by-turn waypoints, gas stations, restaurants, and points of interest</span>
+        </div>
+        <div class="app-feature">
+          <span class="app-feature-icon">&#128197;</span>
+          <span><strong>Daily Itinerary</strong> - View each day's schedule, distances, and planned stops</span>
+        </div>
+        <div class="app-feature">
+          <span class="app-feature-icon">&#128101;</span>
+          <span><strong>Rider Directory</strong> - See who's on the tour with photos, bikes, and contact info</span>
+        </div>
+        <div class="app-feature">
+          <span class="app-feature-icon">&#128172;</span>
+          <span><strong>Group Chat</strong> - Communicate with the group during the ride</span>
+        </div>
+        <div class="app-feature">
+          <span class="app-feature-icon">&#128679;</span>
+          <span><strong>Emergency Info</strong> - Quick access to emergency contacts, medical info, and important documents</span>
+        </div>
+        <div class="app-feature">
+          <span class="app-feature-icon">&#127968;</span>
+          <span><strong>Accommodation Details</strong> - View your nightly selections and hotel/campsite information</span>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <hr style="border: none; border-top: 2px solid #e5e7eb; margin: 30px 0;">
+
+      <!-- Registration Confirmation Header -->
+      <p style="font-size: 16px; font-weight: 600; color: #1e3a5f; margin-bottom: 20px;">Your Registration Information</p>
+      <p style="font-size: 14px; color: #4b5563; margin-bottom: 20px;">Please review the details below and let me know if anything needs to be updated.</p>
+
+      <!-- Personal Information -->
+      <div class="section">
+        <div class="section-title">Personal Information</div>
+        <div class="info-grid">
+          <span class="label">Full Name:</span>
+          <span class="value">Mike Thompson</span>
+
+          <span class="label">Nickname:</span>
+          <span class="value">Throttle Mike</span>
+
+          <span class="label">Tagline:</span>
+          <span class="value">Adventure seeker since 1995</span>
+
+          <span class="label">Email:</span>
+          <span class="value">mike.thompson@email.com</span>
+
+          <span class="label">Location:</span>
+          <span class="value">Los Angeles, CA 90210</span>
+
+          <span class="label">Phone:</span>
+          <span class="value">(555) 200-0001</span>
+        </div>
+      </div>
+
+      <!-- Emergency Contact -->
+      <div class="section">
+        <div class="section-title">Emergency Contact</div>
+        <div class="info-grid">
+          <span class="label">Contact Name:</span>
+          <span class="value">Sarah Thompson</span>
+
+          <span class="label">Relationship:</span>
+          <span class="value">Wife</span>
+
+          <span class="label">Phone:</span>
+          <span class="value">(555) 200-0002</span>
+
+          <span class="label">Medical Info:</span>
+          <span class="value">No known allergies</span>
+        </div>
+      </div>
+
+      <!-- Motorcycle & Experience -->
+      <div class="section">
+        <div class="section-title">Motorcycle & Experience</div>
+        <div class="info-grid">
+          <span class="label">Motorcycle:</span>
+          <span class="value">2023 BMW F 850 GS</span>
+
+          <span class="label">Years Riding:</span>
+          <span class="value">5-10 years</span>
+
+          <span class="label">Off-Road Exp:</span>
+          <span class="value">Intermediate</span>
+
+          <span class="label">Baja Experience:</span>
+          <span class="value">First time</span>
+
+          <span class="label">Repair Skills:</span>
+          <span class="value">Comfortable - I carry tools</span>
+
+          <span class="label">Pillion:</span>
+          <span class="value">No</span>
+        </div>
+      </div>
+
+      <!-- Other Info -->
+      <div class="section">
+        <div class="section-title">Other Information</div>
+        <div class="info-grid">
+          <span class="label">Spanish Level:</span>
+          <span class="value">I can read a bit</span>
+
+          <span class="label">Passport Valid:</span>
+          <span class="value">Yes</span>
+
+          <span class="label">T-Shirt Size:</span>
+          <span class="value">XL</span>
+
+          <span class="label">Garmin InReach:</span>
+          <span class="value">Yes</span>
+
+          <span class="label">Toolkit:</span>
+          <span class="value">Yes</span>
+
+          <span class="label">Special Skills:</span>
+          <span class="value">Photography</span>
+        </div>
+      </div>
+
+      <!-- Nightly Selections -->
+      <div class="section">
+        <div class="section-title">Nightly Selections</div>
+
+        <!-- Preferences -->
+        <div class="preferences-box">
+          <h4>Your Preferences</h4>
+          <div class="info-grid">
+            <span class="label">Roommate:</span>
+            <span class="value">Bob Martinez</span>
+
+            <span class="label">Dietary:</span>
+            <span class="value">None</span>
+          </div>
+        </div>
+
+        <!-- Night 1 -->
+        <div class="night-card" style="margin-top: 15px;">
+          <div class="night-header">
+            Night 1 <span class="night-location">- Temecula, CA</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-hotel">Hotel</span>
+              <span>Best Western Plus Temecula</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Night 2 -->
+        <div class="night-card">
+          <div class="night-header">
+            Night 2 <span class="night-location">- Rancho Meling, BC</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-hotel">Hotel</span>
+              <span>Rancho Meling - Shared Room</span>
+            </div>
+            <div class="item">
+              <span class="badge badge-meal">Dinner</span>
+              <span>Rancho Meling Family Dinner</span>
+            </div>
+            <div class="item">
+              <span class="badge badge-meal">Breakfast</span>
+              <span>Rancho Meling Breakfast</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Night 3 -->
+        <div class="night-card">
+          <div class="night-header">
+            Night 3 <span class="night-location">- Laguna Ojo de Liebre, BCS</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-camping">Camping</span>
+              <span>Whale Preserve Camp</span>
+            </div>
+            <div class="item">
+              <span class="badge badge-activity">Activity</span>
+              <span>Whale Watching Tour</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Night 4 -->
+        <div class="night-card">
+          <div class="night-header">
+            Night 4 <span class="night-location">- Playa El Burro, BCS</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-camping">Camping</span>
+              <span>Beach Camping</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Night 5 -->
+        <div class="night-card">
+          <div class="night-header">
+            Night 5 <span class="night-location">- Playa El Burro, BCS (Rest Day)</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-camping">Camping</span>
+              <span>Beach Camping</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Night 6 -->
+        <div class="night-card">
+          <div class="night-header">
+            Night 6 <span class="night-location">- Bahia de los Angeles, BC</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-hotel">Hotel</span>
+              <span>Camp Archelon</span>
+            </div>
+            <div class="item">
+              <span class="badge badge-meal">Dinner</span>
+              <span>Group Dinner</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Night 7 -->
+        <div class="night-card">
+          <div class="night-header">
+            Night 7 <span class="night-location">- Tecate, BC</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-hotel">Hotel</span>
+              <span>Santuario Diegueno</span>
+            </div>
+            <div class="item">
+              <span class="badge badge-meal">Dinner</span>
+              <span>Group Farewell Dinner</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Night 8 -->
+        <div class="night-card">
+          <div class="night-header">
+            Night 8 <span class="night-location">- Twentynine Palms, CA</span>
+          </div>
+          <div class="night-details">
+            <div class="item">
+              <span class="badge badge-hotel">Hotel</span>
+              <span>Fairfield Inn & Suites</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <p style="margin-top: 25px; color: #4b5563; font-size: 14px;">
+        If you see any errors and need to make changes please reply to this email and let me know the changes.
+      </p>
+
+      <p style="margin-top: 20px;">
+        See you on the road!<br>
+        <strong>Kevin Coleman</strong><br>
+        Tour Organizer
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Baja Tour 2026 | March 19-27, 2026</p>
+      <p><a href="https://bajarun.ncmotoadv.com">bajarun.ncmotoadv.com</a></p>
+    </div>
+  </div>
+</body>
+</html>
