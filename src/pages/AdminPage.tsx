@@ -58,6 +58,7 @@ import {
 } from 'lucide-react';
 import type { NightConfig, UserSelections, OptionalActivity, PaymentMethod } from '../types/eventConfig';
 import { TRIP_NIGHTS } from '../types/eventConfig';
+import EmailComposer from '../components/EmailComposer';
 
 // Admin UID - only this user can access the admin page
 const ADMIN_UID = 'kGEO7bTgqMMsDfXmkumneI44S9H2';
@@ -127,14 +128,6 @@ export default function AdminPage() {
 
   // Profile viewer state
   const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null);
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
-  const [emailRecipients, setEmailRecipients] = useState<'all' | 'selected'>('all');
-  const [selectedRecipientUids, setSelectedRecipientUids] = useState<string[]>([]);
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [emailResult, setEmailResult] = useState<{ sent: number; failed: number } | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
 
   // Announcement state
   interface Announcement {
@@ -987,75 +980,6 @@ export default function AdminPage() {
     }
   };
 
-  // Toggle recipient selection for email
-  const toggleRecipient = (uid: string) => {
-    setSelectedRecipientUids(prev =>
-      prev.includes(uid)
-        ? prev.filter(id => id !== uid)
-        : [...prev, uid]
-    );
-  };
-
-  // Select all recipients
-  const selectAllRecipients = () => {
-    setSelectedRecipientUids(registrations.map(r => r.uid));
-  };
-
-  // Deselect all recipients
-  const deselectAllRecipients = () => {
-    setSelectedRecipientUids([]);
-  };
-
-  // Send bulk email
-  const handleSendEmail = async () => {
-    if (!emailSubject.trim()) {
-      setEmailError('Subject is required');
-      return;
-    }
-    if (!emailBody.trim()) {
-      setEmailError('Message body is required');
-      return;
-    }
-    if (emailRecipients === 'selected' && selectedRecipientUids.length === 0) {
-      setEmailError('Please select at least one recipient');
-      return;
-    }
-
-    const recipientCount = emailRecipients === 'all'
-      ? registrations.length
-      : selectedRecipientUids.length;
-
-    const confirmMessage = `Are you sure you want to send this email to ${recipientCount} participant${recipientCount !== 1 ? 's' : ''}?`;
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-
-    setSendingEmail(true);
-    setEmailError(null);
-    setEmailResult(null);
-
-    try {
-      const sendBulkEmailFn = httpsCallable(functions, 'sendBulkEmail');
-      const response = await sendBulkEmailFn({
-        subject: emailSubject,
-        body: emailBody,
-        recipientUids: emailRecipients === 'all' ? 'all' : selectedRecipientUids
-      });
-
-      const data = response.data as { sent: number; failed: number; errors?: string[] };
-      setEmailResult({ sent: data.sent, failed: data.failed });
-
-      if (data.errors && data.errors.length > 0) {
-        console.warn('Some emails failed:', data.errors);
-      }
-    } catch (err: any) {
-      console.error('Error sending email:', err);
-      setEmailError(err.message || 'Failed to send email');
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
   // Show loading state
   if (authLoading || loading) {
     return (
@@ -1847,202 +1771,8 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'email' && (
-          /* Email Tab */
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Email Composer */}
-            <div className="space-y-6">
-              {/* Recipient Selection */}
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Recipients</h3>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 p-3 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
-                    <input
-                      type="radio"
-                      name="recipients"
-                      checked={emailRecipients === 'all'}
-                      onChange={() => setEmailRecipients('all')}
-                      className="h-4 w-4 text-blue-600"
-                    />
-                    <Users className="h-5 w-5 text-slate-400" />
-                    <span className="text-white">All Participants ({registrations.length})</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
-                    <input
-                      type="radio"
-                      name="recipients"
-                      checked={emailRecipients === 'selected'}
-                      onChange={() => setEmailRecipients('selected')}
-                      className="h-4 w-4 text-blue-600"
-                    />
-                    <CheckCircle className="h-5 w-5 text-slate-400" />
-                    <span className="text-white">Selected Participants ({selectedRecipientUids.length})</span>
-                  </label>
-
-                  {emailRecipients === 'selected' && (
-                    <div className="ml-8 mt-2">
-                      <div className="flex gap-2 mb-3">
-                        <button
-                          onClick={selectAllRecipients}
-                          className="text-sm text-blue-400 hover:text-blue-300"
-                        >
-                          Select All
-                        </button>
-                        <span className="text-slate-600">|</span>
-                        <button
-                          onClick={deselectAllRecipients}
-                          className="text-sm text-blue-400 hover:text-blue-300"
-                        >
-                          Deselect All
-                        </button>
-                      </div>
-                      <div className="max-h-48 overflow-y-auto space-y-2">
-                        {registrations.map((reg) => (
-                          <label
-                            key={reg.id}
-                            className="flex items-center gap-3 p-2 hover:bg-slate-700/50 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedRecipientUids.includes(reg.uid)}
-                              onChange={() => toggleRecipient(reg.uid)}
-                              className="h-4 w-4 text-blue-600 rounded"
-                            />
-                            <span className="text-slate-300 text-sm">{reg.fullName}</span>
-                            <span className="text-slate-500 text-xs">({reg.email})</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Subject */}
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <label className="block text-white font-semibold mb-2">Subject</label>
-                <input
-                  type="text"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder="Enter email subject..."
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Body */}
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                <label className="block text-white font-semibold mb-2">Message</label>
-                <textarea
-                  value={emailBody}
-                  onChange={(e) => setEmailBody(e.target.value)}
-                  placeholder="Enter your message..."
-                  rows={10}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 resize-none"
-                />
-                <p className="mt-2 text-xs text-slate-500">
-                  Line breaks will be preserved. The recipient's first name will be automatically added to the greeting.
-                </p>
-              </div>
-
-              {/* Error */}
-              {emailError && (
-                <div className="flex items-center gap-2 p-4 bg-red-600/10 border border-red-500/30 rounded-lg text-red-400">
-                  <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                  <span>{emailError}</span>
-                </div>
-              )}
-
-              {/* Success */}
-              {emailResult && (
-                <div className="flex items-center gap-2 p-4 bg-green-600/10 border border-green-500/30 rounded-lg text-green-400">
-                  <CheckCircle className="h-5 w-5 flex-shrink-0" />
-                  <span>
-                    Sent successfully to {emailResult.sent} recipient{emailResult.sent !== 1 ? 's' : ''}
-                    {emailResult.failed > 0 && ` (${emailResult.failed} failed)`}
-                  </span>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowPreview(!showPreview)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                >
-                  <Eye className="h-4 w-4" />
-                  {showPreview ? 'Hide Preview' : 'Preview'}
-                </button>
-                <button
-                  onClick={handleSendEmail}
-                  disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                >
-                  {sendingEmail ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  {sendingEmail ? 'Sending...' : 'Send Email'}
-                </button>
-              </div>
-            </div>
-
-            {/* Preview */}
-            {showPreview && (
-              <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-                <div className="bg-slate-900 px-4 py-2 border-b border-slate-700">
-                  <span className="text-sm font-medium text-slate-400">Email Preview</span>
-                </div>
-                <div className="p-6">
-                  <div className="bg-white rounded-lg overflow-hidden shadow-lg">
-                    {/* Email Header */}
-                    <div
-                      style={{
-                        background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
-                        padding: '30px',
-                        textAlign: 'center',
-                      }}
-                    >
-                      <h1 style={{ color: '#ffffff', margin: 0, fontSize: '24px' }}>
-                        BMW Baja Tour 2026
-                      </h1>
-                    </div>
-
-                    {/* Email Body */}
-                    <div style={{ padding: '30px' }}>
-                      <p style={{ color: '#374151', margin: '0 0 20px 0', fontSize: '16px' }}>
-                        Hi [First Name],
-                      </p>
-                      <div
-                        style={{ color: '#374151', fontSize: '16px', lineHeight: 1.6 }}
-                        dangerouslySetInnerHTML={{
-                          __html: (emailBody || 'Message body goes here...').replace(/\n/g, '<br />'),
-                        }}
-                      />
-                    </div>
-
-                    {/* Email Footer */}
-                    <div
-                      style={{
-                        backgroundColor: '#f9fafb',
-                        padding: '20px',
-                        textAlign: 'center',
-                        borderTop: '1px solid #e5e7eb',
-                      }}
-                    >
-                      <p style={{ color: '#9ca3af', fontSize: '12px', margin: 0 }}>
-                        BMW Motorcycle Club - Baja Tour 2026
-                      </p>
-                      <p style={{ color: '#9ca3af', fontSize: '12px', margin: '10px 0 0 0' }}>
-                        March 19-27, 2026
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          /* Email Tab - Using EmailComposer component */
+          <EmailComposer registrations={registrations} />
         )}
 
         {/* Announcements Tab */}

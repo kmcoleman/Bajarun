@@ -20,7 +20,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
 import { db, functions } from '../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 // Admin UID
@@ -82,9 +82,18 @@ interface RiderData {
   selections: UserSelections;
 }
 
+interface NightConfig {
+  hotelAvailable: boolean;
+  campingAvailable: boolean;
+  dinnerAvailable: boolean;
+  breakfastAvailable: boolean;
+  optionalActivities?: Array<{ id: string; title: string; cost: number; description: string }>;
+}
+
 export default function TourUpdateEmailPage() {
   const { user, loading: authLoading } = useAuth();
   const [riders, setRiders] = useState<RiderData[]>([]);
+  const [nightConfigs, setNightConfigs] = useState<Record<string, NightConfig>>({});
   const [loading, setLoading] = useState(true);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [sending, setSending] = useState(false);
@@ -99,6 +108,16 @@ export default function TourUpdateEmailPage() {
 
     const fetchData = async () => {
       try {
+        // Fetch event pricing config (for night options)
+        const configRef = doc(db, 'eventConfig', 'pricing');
+        const configSnap = await getDoc(configRef);
+        if (configSnap.exists()) {
+          const data = configSnap.data();
+          if (data.nights) {
+            setNightConfigs(data.nights);
+          }
+        }
+
         // Fetch registrations
         const regsSnapshot = await getDocs(collection(db, 'registrations'));
         const registrations: Registration[] = regsSnapshot.docs.map(doc => ({
@@ -166,7 +185,7 @@ export default function TourUpdateEmailPage() {
     const firstName = r.nickname || r.fullName.split(' ')[0];
 
     // Build nightly selections HTML
-    const nightsHtml = buildNightsHtml(rider.selections);
+    const nightsHtml = buildNightsHtml(rider.selections, nightConfigs);
 
     return `<!DOCTYPE html>
 <html>
@@ -281,11 +300,9 @@ export default function TourUpdateEmailPage() {
     <div class="content">
       <p>Hello <strong>${firstName}</strong>,</p>
 
-      <p>Happy New Year! Thanks so much for registering for the Baja Tour, submitting your deposit on time, and taking the time to register (or re-register) and update your preferences on the website. Having everyone's information in a database makes it so much easier to manage the event - I really appreciate it.</p>
+      <p>Happy New Year! Thanks so much for registering for the Baja Tour, submitting your deposit on time, and taking the time to register (or re-register) and update your preferences on the website. Having everyone's information in a database makes it so much easier to manage the event - I really appreciate it. We have a great group of riders signed up.</p>
 
-      <p>I know most of the people who have registered and we have a great group of riders. I'm confident we'll have an amazing time together.</p>
-
-      <p>This email includes some updates on tour planning as well as all of your registration information. Please review and let me know if you see any errors or want to make a change.</p>
+      <p>This email includes updates on tour planning as well as all of your registration information. Please review and let me know if you see any errors or want to make a change.</p>
 
       <h2>Ride Briefing - January 7, 2026</h2>
       <p>I am hosting a Google Meet to review the plans, answer any questions, and review feedback - keeping in mind that the itinerary is pretty firm at this point and difficult to change.</p>
@@ -338,6 +355,7 @@ export default function TourUpdateEmailPage() {
 
       <h2>Your Registration Information</h2>
       <p>Please review the details below and let me know if anything needs to be updated.</p>
+      <p style="font-size: 14px; color: #6b7280; margin-top: 10px;">When reviewing your accommodation, meal, and activity selections, keep in mind that for Night 1 (Temecula) and Night 7 (Tecate) I only offered Hotel, and for Nights 3 (Ojo de Liebre) and Nights 4 &amp; 5 (Mulegé) I only offered Camping. For meals, I only offered group dinners on Nights 2, 3, 6, and 8. I will probably have an option for us in Tecate and Playa El Burro later.</p>
 
       <h3>Personal Information</h3>
       <table class="info-table">
@@ -410,16 +428,8 @@ export default function TourUpdateEmailPage() {
 </html>`;
   };
 
-  // Activity ID to name mapping
-  const activityNames: Record<string, string> = {
-    'activity-1766335810767': 'Whale Watching: Ojo de Liebre Lagoon',
-    'activity-1766335514467': 'Mulegé: The Palm Oasis',
-    'activity-1766335582384': 'Loreto: The Colonial Coast',
-    'activity-1766335717917': 'San Javier: The Mountain Climb'
-  };
-
   // Build HTML for nightly selections
-  const buildNightsHtml = (selections: UserSelections): string => {
+  const buildNightsHtml = (selections: UserSelections, configs: Record<string, NightConfig>): string => {
     const nights = [
       { key: 'night-1', label: 'Night 1', location: 'Temecula, CA' },
       { key: 'night-2', label: 'Night 2', location: 'Rancho Meling, BC' },
@@ -433,50 +443,109 @@ export default function TourUpdateEmailPage() {
 
     return nights.map(night => {
       const sel = selections[night.key] || {};
-      const accommodation = sel.accommodation || 'Not selected';
+      const config = configs[night.key] || {};
+      const accommodation = sel.accommodation || '';
       const isHotel = accommodation.toLowerCase() === 'hotel';
       const isOwn = accommodation.toLowerCase() === 'own';
       const isCamping = accommodation.toLowerCase() === 'camping';
 
-      // Determine accommodation text
-      let accommodationText = 'Not selected';
+      // Determine what options were available
+      const hotelAvailable = config.hotelAvailable || false;
+      const campingAvailable = config.campingAvailable || false;
+
+      // Build "Available" text
+      const availableOptions: string[] = [];
+      if (hotelAvailable) availableOptions.push('Hotel');
+      if (campingAvailable) availableOptions.push('Camping');
+      availableOptions.push('Own arrangements'); // Always available
+
+      let availableText = '';
+      if (availableOptions.length === 2) {
+        availableText = `${availableOptions[0]} or ${availableOptions[1]}`;
+      } else {
+        const last = availableOptions.pop();
+        availableText = `${availableOptions.join(', ')}, or ${last}`;
+      }
+
+      // Determine selection text
+      let selectionText = 'Not yet selected';
       if (isHotel) {
-        accommodationText = 'Hotel';
-      } else if (isOwn) {
-        accommodationText = 'Making separate plans';
+        selectionText = 'Hotel ✓';
       } else if (isCamping) {
-        accommodationText = 'Camping';
+        selectionText = 'Camping ✓';
+      } else if (isOwn) {
+        selectionText = 'Own arrangements ✓';
       }
 
-      // Build details array
-      const details: string[] = [accommodationText];
+      // Build meals section
+      const dinnerAvailable = config.dinnerAvailable || false;
+      const breakfastAvailable = config.breakfastAvailable || false;
+      const hasMealOptions = dinnerAvailable || breakfastAvailable;
 
-      // Add meals
-      if (sel.breakfast && sel.dinner) {
-        details.push('Breakfast + Dinner');
-      } else if (sel.breakfast) {
-        details.push('Breakfast');
-      } else if (sel.dinner) {
-        details.push('Dinner');
+      let mealsHtml = '';
+      if (hasMealOptions) {
+        const mealsAvailable: string[] = [];
+        if (dinnerAvailable) mealsAvailable.push('Dinner');
+        if (breakfastAvailable) mealsAvailable.push('Breakfast');
+        const mealsAvailableText = mealsAvailable.join(' and ');
+
+        const mealsSelected: string[] = [];
+        if (sel.dinner && dinnerAvailable) mealsSelected.push('Dinner ✓');
+        if (sel.breakfast && breakfastAvailable) mealsSelected.push('Breakfast ✓');
+        const mealsSelectedText = mealsSelected.length > 0 ? mealsSelected.join(', ') : 'None selected';
+
+        mealsHtml = `
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+            <div style="color: #6b7280; font-size: 13px;">Meals available: ${mealsAvailableText}</div>
+            <div style="color: #111827; font-weight: 500; margin-top: 2px;">Your selection: ${mealsSelectedText}</div>
+          </div>
+        `;
       }
 
-      // Add activities
-      if (sel.optionalActivitiesInterested && sel.optionalActivitiesInterested.length > 0) {
-        sel.optionalActivitiesInterested.forEach(activityId => {
-          const activityName = activityNames[activityId] || activityId;
-          details.push(activityName);
-        });
+      // Build activities section
+      const activities = config.optionalActivities || [];
+      const hasActivityOptions = activities.length > 0;
+
+      let activitiesHtml = '';
+      if (hasActivityOptions) {
+        const activitiesAvailable = activities.map((a: any) => a.title).join(', ');
+
+        const activitiesSelected: string[] = [];
+        if (sel.optionalActivitiesInterested && sel.optionalActivitiesInterested.length > 0) {
+          sel.optionalActivitiesInterested.forEach(activityId => {
+            const activity = activities.find((a: any) => a.id === activityId);
+            if (activity) {
+              activitiesSelected.push(`${activity.title} ✓`);
+            }
+          });
+        }
+        const activitiesSelectedText = activitiesSelected.length > 0 ? activitiesSelected.join(', ') : 'None selected';
+
+        activitiesHtml = `
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+            <div style="color: #6b7280; font-size: 13px;">Activities available: ${activitiesAvailable}</div>
+            <div style="color: #111827; font-weight: 500; margin-top: 2px;">Your selection: ${activitiesSelectedText}</div>
+          </div>
+        `;
       }
 
-      // Add preferences
+      // Build preferences/notes
+      const notes: string[] = [];
       if (sel.prefersSingleRoom) {
-        details.push('Single Room Requested');
+        notes.push('Single Room Requested');
       }
+      const notesHtml = notes.length > 0
+        ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; color: #7c3aed; font-size: 13px; font-weight: 500;">Note: ${notes.join(', ')}</div>`
+        : '';
 
       return `
         <div class="night-row">
           <div class="night-title">${night.label} - ${night.location}</div>
-          <div class="night-details">${details.join(' • ')}</div>
+          <div class="night-available" style="color: #6b7280; font-size: 13px;">Accommodation available: ${availableText}</div>
+          <div class="night-selection" style="color: #111827; font-weight: 500; margin-top: 2px;">Your selection: ${selectionText}</div>
+          ${mealsHtml}
+          ${activitiesHtml}
+          ${notesHtml}
         </div>
       `;
     }).join('');
