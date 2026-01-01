@@ -80,7 +80,7 @@ interface Announcement {
 }
 
 // Pages that don't require terms acceptance
-const PUBLIC_PAGES = ['/', '/login', '/agree', '/privacy', '/terms', '/support', '/faq', '/guide', '/itinerary', '/waitlist', '/tours'];
+const PUBLIC_PAGES = ['/', '/login', '/agree', '/privacy', '/terms', '/support', '/faq', '/guide', '/itinerary', '/waitlist', '/tours', '/cache-help'];
 
 export default function Layout({ children }: LayoutProps) {
   const { user, logout, loading, hasRegistration, termsAccepted, termsLoading } = useAuth();
@@ -109,9 +109,11 @@ export default function Layout({ children }: LayoutProps) {
 
     const isPublicPage = PUBLIC_PAGES.includes(location.pathname);
     if (!termsAccepted && !isPublicPage) {
-      navigate('/agree');
+      // Pass the original URL (including search params) so user returns after accepting
+      const originalUrl = location.pathname + location.search;
+      navigate('/agree', { state: { from: originalUrl } });
     }
-  }, [user, loading, termsAccepted, termsLoading, location.pathname, navigate]);
+  }, [user, loading, termsAccepted, termsLoading, location.pathname, location.search, navigate]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -478,7 +480,7 @@ export default function Layout({ children }: LayoutProps) {
 
                       {/* Profile Dropdown */}
                       {profileOpen && (
-                        <div className="absolute right-0 mt-2 w-80 bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden z-50">
+                        <div className="absolute right-0 mt-2 w-80 max-h-[calc(100vh-5rem)] bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-y-auto overscroll-contain z-50">
                           {loadingProfile ? (
                             <div className="p-6 text-center">
                               <Loader2 className="h-6 w-6 text-blue-400 animate-spin mx-auto" />
@@ -641,6 +643,15 @@ export default function Layout({ children }: LayoutProps) {
                                     >
                                       <Mail className="h-4 w-4" />
                                       Email Templates
+                                    </Link>
+                                    {/* NEW EMAIL SYSTEM (isolated - delete this block to remove) */}
+                                    <Link
+                                      to="/admin/email-system"
+                                      onClick={() => setProfileOpen(false)}
+                                      className="flex items-center gap-2 w-full px-3 py-2 text-amber-400 hover:bg-slate-700 hover:text-amber-300 rounded-lg transition-colors"
+                                    >
+                                      <Mail className="h-4 w-4" />
+                                      Email System (New)
                                     </Link>
                                     <Link
                                       to="/admin/room-assignments"
@@ -837,6 +848,15 @@ export default function Layout({ children }: LayoutProps) {
                         >
                           <Mail className="h-5 w-5" />
                           <span>Email Templates</span>
+                        </Link>
+                        {/* NEW EMAIL SYSTEM (isolated - delete this block to remove) */}
+                        <Link
+                          to="/admin/email-system"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 w-full px-4 py-2 text-amber-400 hover:bg-slate-700 rounded-lg transition-colors"
+                        >
+                          <Mail className="h-5 w-5" />
+                          <span>Email System (New)</span>
                         </Link>
                         <Link
                           to="/admin/room-assignments"

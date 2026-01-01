@@ -45,6 +45,8 @@ import {
 import * as Haptics from '../../lib/haptics';
 import * as FileSystem from 'expo-file-system';
 import ImageViewing from 'react-native-image-viewing';
+import { useModeration } from '../../hooks/useModeration';
+import ReportBlockModal from '../../components/ReportBlockModal';
 
 // Lazy load MediaLibrary to avoid crash if native module not available
 let MediaLibrary: typeof import('expo-media-library') | null = null;
@@ -100,6 +102,11 @@ export default function GalleryPage() {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [selectedMediaForReport, setSelectedMediaForReport] = useState<MediaItem | null>(null);
+
+  // Moderation hook for blocking/reporting
+  const { filterBlockedContent, isBlocked } = useModeration();
 
   const lastDocRef = useRef<QueryDocumentSnapshot | null>(null);
   const isFirstLoad = useRef(true);
@@ -328,9 +335,13 @@ export default function GalleryPage() {
     }
   }
 
-  // Filter media based on active filter
+  // Filter media based on active filter and blocked users
   const filteredMedia = useMemo(() => {
-    return mediaItems.filter(item => {
+    // First filter out blocked users' content
+    const unblockedMedia = filterBlockedContent(mediaItems);
+
+    // Then apply the active filter
+    return unblockedMedia.filter(item => {
       switch (activeFilter) {
         case 'Photos':
           return item.type === 'photo';
@@ -350,7 +361,7 @@ export default function GalleryPage() {
           return true;
       }
     });
-  }, [mediaItems, activeFilter]);
+  }, [mediaItems, activeFilter, filterBlockedContent]);
 
   const formatTimeAgo = (date: Date) => {
     const now = new Date();
@@ -462,8 +473,15 @@ export default function GalleryPage() {
     );
   }, [photoItems, saving, saveCurrentImage]);
 
+  const handleOpenReportModal = useCallback((item: MediaItem) => {
+    setSelectedMediaForReport(item);
+    setReportModalVisible(true);
+    Haptics.lightTap();
+  }, []);
+
   const renderMediaItem = useCallback(({ item, index }: { item: MediaItem; index: number }) => {
     const isLiked = user?.uid && item.likedBy.includes(user.uid);
+    const isOwnContent = user?.uid === item.uploadedBy;
     // Vary aspect ratio for visual interest
     const aspectRatio = item.type === 'video' ? 16/9 : (index % 3 === 0 ? 3/4 : 1);
 
@@ -538,14 +556,25 @@ export default function GalleryPage() {
                 {item.likes}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.timestamp, { color: theme.textMuted }]}>
-              {formatTimeAgo(item.createdAt)}
-            </Text>
+            <View style={styles.footerRight}>
+              <Text style={[styles.timestamp, { color: theme.textMuted }]}>
+                {formatTimeAgo(item.createdAt)}
+              </Text>
+              {!isOwnContent && (
+                <TouchableOpacity
+                  style={styles.moreButton}
+                  onPress={() => handleOpenReportModal(item)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <FontAwesome name="ellipsis-h" size={14} color={theme.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </TouchableOpacity>
     );
-  }, [user?.uid, theme, handleLike]);
+  }, [user?.uid, theme, handleLike, handleOpenReportModal]);
 
   const renderFooter = () => {
     if (!loadingMore) return null;
@@ -680,6 +709,26 @@ export default function GalleryPage() {
         doubleTapToZoomEnabled={true}
         FooterComponent={ImageViewerFooter}
       />
+
+      {/* Report/Block Modal */}
+      {selectedMediaForReport && (
+        <ReportBlockModal
+          visible={reportModalVisible}
+          onClose={() => {
+            setReportModalVisible(false);
+            setSelectedMediaForReport(null);
+          }}
+          contentType="media"
+          contentId={selectedMediaForReport.id}
+          contentOwnerId={selectedMediaForReport.uploadedBy}
+          contentOwnerName={selectedMediaForReport.uploaderName}
+          contentSnapshot={{
+            url: selectedMediaForReport.url,
+            caption: selectedMediaForReport.caption,
+            type: selectedMediaForReport.type,
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -836,6 +885,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  footerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  moreButton: {
+    padding: 4,
   },
   likeButton: {
     flexDirection: 'row',

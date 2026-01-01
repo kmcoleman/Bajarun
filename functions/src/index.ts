@@ -1393,3 +1393,13 @@ export const seedTours = onCall(
     }
   }
 );
+
+// ============================================================
+// NEW EMAIL SYSTEM (isolated - delete this line to remove)
+// ============================================================
+export * from "./emailSystem";
+
+// ============================================================
+// ACCOUNT DELETION (App Store requirement)
+// ============================================================
+export * from "./accountDeletion";

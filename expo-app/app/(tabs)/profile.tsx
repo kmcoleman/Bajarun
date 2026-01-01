@@ -24,6 +24,9 @@ import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineData } from '../../hooks/useOfflineData';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../lib/firebase';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { openDocument, cacheAllDocuments, getDocumentCacheStatus } from '../../lib/documents';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, borderRadius } from '../../constants/theme';
@@ -70,6 +73,10 @@ export default function ProfilePage() {
   // Info menu expansion state
   const [infoExpanded, setInfoExpanded] = useState(false);
 
+  // Account deletion state
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
   // Cache documents and track status
   useEffect(() => {
     if (riderDocuments) {
@@ -88,6 +95,7 @@ export default function ProfilePage() {
 
   // Initialize edit form values when modal opens
   const openEditModal = () => {
+    Haptics.lightTap();
     setEditPhone(userProfile?.odPhone || '');
     setEditEmail(userProfile?.odEmail || '');
     setEditEmergencyName(userProfile?.odEmergencyContactName || '');
@@ -131,6 +139,61 @@ export default function ProfilePage() {
         { text: 'Sign Out', style: 'destructive', onPress: signOut },
       ]
     );
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user?.uid) return;
+
+    setDeletingAccount(true);
+
+    try {
+      // Try to get Apple authorization code for token revocation
+      let appleAuthorizationCode: string | undefined;
+
+      // Check if user signed in with Apple
+      const providerData = user.providerData || [];
+      const isAppleUser = providerData.some(p => p.providerId === 'apple.com');
+
+      if (isAppleUser) {
+        try {
+          // Re-authenticate with Apple to get fresh authorization code
+          const credential = await AppleAuthentication.signInAsync({
+            requestedScopes: [
+              AppleAuthentication.AppleAuthenticationScope.EMAIL,
+            ],
+          });
+          appleAuthorizationCode = credential.authorizationCode || undefined;
+        } catch (appleError) {
+          // User cancelled or Apple auth failed - continue without revocation
+          console.log('Apple re-auth failed, continuing without token revocation');
+        }
+      }
+
+      // Call Cloud Function to delete account
+      const deleteAccountFn = httpsCallable(functions, 'deleteAccount');
+      await deleteAccountFn({
+        appleAuthorizationCode,
+      });
+
+      // Sign out locally
+      await signOut();
+
+      Alert.alert(
+        'Account Deleted',
+        'Your account and all associated data have been permanently deleted.',
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('Account deletion error:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to delete account. Please try again or contact support.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setDeletingAccount(false);
+      setDeleteModalVisible(false);
+    }
   };
 
   const handleViewDocument = async (docType: DocumentType) => {
@@ -412,6 +475,7 @@ export default function ProfilePage() {
           <TouchableOpacity
             style={[styles.editProfileButton, { borderColor: theme.accent }]}
             onPress={openEditModal}
+            activeOpacity={0.6}
           >
             <FontAwesome name="pencil" size={14} color={theme.accent} />
             <Text style={[styles.editProfileText, { color: theme.accent }]}>Edit Profile</Text>
@@ -704,7 +768,7 @@ export default function ProfilePage() {
               Haptics.lightTap();
               setThemePreference('system');
             }}
-            style={styles.settingRow}
+            style={[styles.settingRow, { borderBottomColor: theme.cardBorder }]}
           >
             <View style={styles.settingInfo}>
               <FontAwesome name="mobile" size={18} color={theme.textMuted} />
@@ -713,6 +777,21 @@ export default function ProfilePage() {
             {themePreference === 'system' && (
               <FontAwesome name="check" size={16} color={theme.success} />
             )}
+          </TouchableOpacity>
+
+          {/* Delete Account */}
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.lightTap();
+              setDeleteModalVisible(true);
+            }}
+            style={[styles.settingRow, { borderBottomWidth: 0 }]}
+          >
+            <View style={styles.settingInfo}>
+              <FontAwesome name="trash" size={18} color={theme.danger} />
+              <Text style={[styles.settingText, { color: theme.danger }]}>Delete Account</Text>
+            </View>
+            <FontAwesome name="chevron-right" size={14} color={theme.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -829,6 +908,69 @@ export default function ProfilePage() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !deletingAccount && setDeleteModalVisible(false)}
+      >
+        <View style={styles.deleteModalOverlay}>
+          <View style={[styles.deleteModalContent, { backgroundColor: theme.card }]}>
+            <View style={[styles.deleteModalIcon, { backgroundColor: theme.danger + '20' }]}>
+              <FontAwesome name="exclamation-triangle" size={32} color={theme.danger} />
+            </View>
+
+            <Text style={[styles.deleteModalTitle, { color: theme.textPrimary }]}>
+              Delete Account?
+            </Text>
+
+            <Text style={[styles.deleteModalText, { color: theme.textMuted }]}>
+              This action is permanent and cannot be undone. All your data will be deleted, including:
+            </Text>
+
+            <View style={styles.deleteModalList}>
+              <Text style={[styles.deleteModalListItem, { color: theme.textSecondary }]}>
+                • Your registration and profile
+              </Text>
+              <Text style={[styles.deleteModalListItem, { color: theme.textSecondary }]}>
+                • Tour selections and preferences
+              </Text>
+              <Text style={[styles.deleteModalListItem, { color: theme.textSecondary }]}>
+                • Payment history and ledger
+              </Text>
+              <Text style={[styles.deleteModalListItem, { color: theme.textSecondary }]}>
+                • Uploaded documents and photos
+              </Text>
+            </View>
+
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalCancelButton, { borderColor: theme.cardBorder }]}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deletingAccount}
+              >
+                <Text style={[styles.deleteModalCancelText, { color: theme.textPrimary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.deleteModalDeleteButton, { backgroundColor: theme.danger }]}
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.deleteModalDeleteText}>Delete Account</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1206,5 +1348,73 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: spacing.lg,
     marginBottom: spacing.md,
+  },
+  // Delete Account Modal styles
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  deleteModalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  deleteModalIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  deleteModalText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  deleteModalList: {
+    alignSelf: 'stretch',
+    marginBottom: spacing.lg,
+  },
+  deleteModalListItem: {
+    fontSize: 13,
+    lineHeight: 22,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  deleteModalCancelButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  deleteModalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  deleteModalDeleteButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  deleteModalDeleteText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });

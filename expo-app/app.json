@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Baja Run 2026",
+    "name": "Nor Cal Moto ADV",
     "slug": "baja-run-2026",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,9 +16,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ncmotoadv.bajarun",
-      "buildNumber": "4",
+      "buildNumber": "9",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Nor Cal Moto ADV uses your camera to take a profile photo and to capture photos and videos during tours to share with fellow riders in the group gallery.",
+        "NSPhotoLibraryUsageDescription": "Nor Cal Moto ADV accesses your photo library so you can select a profile photo and choose photos or videos to share with fellow riders in the group gallery.",
+        "NSPhotoLibraryAddUsageDescription": "Nor Cal Moto ADV saves tour photos and videos from the group gallery to your device so you can keep your favorite memories.",
+        "NSMicrophoneUsageDescription": "Nor Cal Moto ADV uses your microphone to record audio when capturing videos to share with fellow riders in the group gallery."
       }
     },
     "android": {

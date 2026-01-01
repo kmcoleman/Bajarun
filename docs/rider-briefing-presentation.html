@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BMW Baja Tour 2026 - Rider Briefing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f172a;
+      color: #fff;
+    }
+
+    /* Slide container */
+    .slides {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 80px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      position: relative;
+    }
+
+    .slide.active {
+      display: flex;
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 4rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    h2 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      margin-bottom: 2rem;
+      color: #fff;
+      text-align: center;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #60a5fa;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      font-size: 1.25rem;
+      color: #94a3b8;
+      text-align: center;
+      max-width: 800px;
+    }
+
+    .subtitle {
+      font-size: 1.75rem;
+      color: #60a5fa;
+      margin-bottom: 0.5rem;
+    }
+
+    .tagline {
+      font-size: 1.5rem;
+      color: #94a3b8;
+      margin-top: 2rem;
+    }
+
+    /* Cards */
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 2rem;
+      margin: 0.75rem;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    .card-grid-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      max-width: 900px;
+      border-collapse: collapse;
+      background: #1e293b;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+
+    th {
+      background: #334155;
+      padding: 1rem 1.5rem;
+      text-align: left;
+      font-weight: 600;
+      color: #60a5fa;
+      font-size: 1rem;
+    }
+
+    td {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid #334155;
+      font-size: 1.1rem;
+      color: #e2e8f0;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background: #334155;
+    }
+
+    /* Lists */
+    ul, ol {
+      list-style: none;
+      max-width: 700px;
+      width: 100%;
+    }
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 0.75rem 0;
+      font-size: 1.25rem;
+      color: #e2e8f0;
+    }
+
+    li::before {
+      content: "→";
+      color: #60a5fa;
+      font-weight: bold;
+    }
+
+    .checklist li::before {
+      content: "☐";
+      color: #fbbf24;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      background: rgba(96, 165, 250, 0.2);
+      color: #60a5fa;
+      border-radius: 9999px;
+      font-size: 1rem;
+      font-weight: 500;
+      margin: 0.25rem;
+    }
+
+    .badge-amber {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .badge-green {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+      max-width: 1000px;
+    }
+
+    .stat-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #60a5fa;
+    }
+
+    .stat-label {
+      font-size: 1rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+    }
+
+    /* Icon placeholder */
+    .icon {
+      width: 80px;
+      height: 80px;
+      background: rgba(96, 165, 250, 0.2);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Day cards */
+    .day-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: 100%;
+    }
+
+    .day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .day-number {
+      font-size: 1rem;
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    .day-miles {
+      font-size: 1rem;
+      color: #94a3b8;
+    }
+
+    .day-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+
+    .day-route {
+      font-size: 1rem;
+      color: #94a3b8;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 1rem;
+      z-index: 100;
+    }
+
+    .nav button {
+      background: #334155;
+      border: 1px solid #475569;
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav button:hover {
+      background: #475569;
+    }
+
+    .slide-counter {
+      position: fixed;
+      bottom: 40px;
+      right: 40px;
+      color: #64748b;
+      font-size: 1rem;
+    }
+
+    /* Title slide special */
+    .title-slide {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+    }
+
+    .title-slide h1 {
+      font-size: 5rem;
+      background: linear-gradient(135deg, #fff 0%, #60a5fa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Two column layout */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      max-width: 1100px;
+      width: 100%;
+    }
+
+    .col {
+      text-align: left;
+    }
+
+    .col h3 {
+      margin-bottom: 1.5rem;
+    }
+
+    .col ul {
+      max-width: none;
+    }
+
+    /* Questions slide */
+    .questions-slide {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    }
+
+    .contact-info {
+      display: flex;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .contact-card {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+
+    .contact-card h4 {
+      color: #60a5fa;
+      margin-bottom: 0.5rem;
+    }
+
+    .contact-card p {
+      color: #e2e8f0;
+      font-size: 1.1rem;
+    }
+
+    /* Logo area */
+    .logo {
+      position: fixed;
+      top: 30px;
+      left: 40px;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #64748b;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .slide {
+        padding: 40px;
+      }
+      h1 { font-size: 3rem; }
+      h2 { font-size: 2rem; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .card-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">BMW Baja Tour 2026</div>
+
+  <div class="slides">
+    <!-- Slide 1: Title -->
+    <div class="slide active title-slide" data-slide="1">
+      <div class="icon">🏍️</div>
+      <h1>BMW Baja Tour 2026</h1>
+      <p class="subtitle">Rider Briefing</p>
+      <p class="tagline">March 19-27, 2026 • Temecula → Baja California → Death Valley</p>
+    </div>
+
+    <!-- Slide 2: Agenda -->
+    <div class="slide" data-slide="2">
+      <h2>Today's Agenda</h2>
+      <div class="card-grid">
+        <div class="card">
+          <h3>🗺️ The Route</h3>
+          <p style="text-align:left;font-size:1rem;">Day-by-day breakdown of our 9-day adventure</p>
+        </div>
+        <div class="card">
+          <h3>🏨 Accommodations</h3>
+          <p style="text-align:left;font-size:1rem;">Hotels, camping, and your nightly options</p>
+        </div>
+        <div class="card">
+          <h3>📋 Preparation</h3>
+          <p style="text-align:left;font-size:1rem;">What you need to do before March 19</p>
+        </div>
+        <div class="card">
+          <h3>📱 Website & App</h3>
+          <p style="text-align:left;font-size:1rem;">How to use the tools we've built for you</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 3: Tour at a Glance -->
+    <div class="slide" data-slide="3">
+      <h2>Tour at a Glance</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">9</div>
+          <div class="stat-label">Days</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1,954</div>
+          <div class="stat-label">Total Miles</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">7</div>
+          <div class="stat-label">Riding Days</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">2</div>
+          <div class="stat-label">Rest Days</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:1rem;margin-top:2rem;">
+        <span class="badge">🇺🇸 USA</span>
+        <span class="badge">🇲🇽 Mexico</span>
+        <span class="badge-amber badge">March 19-27, 2026</span>
+      </div>
+    </div>
+
+    <!-- Slide 4: Route Overview -->
+    <div class="slide" data-slide="4">
+      <h2>Route Overview</h2>
+      <div class="card" style="max-width:900px;width:100%;">
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:center;align-items:center;">
+          <span class="badge">Temecula</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Tecate Border</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Rancho Meling</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Whale Sanctuary</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Bahía Concepción</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Bahía de los Ángeles</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Tecate</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Joshua Tree</span>
+          <span style="color:#64748b;">→</span>
+          <span class="badge">Death Valley</span>
+        </div>
+      </div>
+      <p style="margin-top:2rem;color:#94a3b8;">Baja's best: Wine country, whale lagoons, turquoise beaches, desert canyons, and national parks</p>
+    </div>
+
+    <!-- Slide 5: Days 1-3 -->
+    <div class="slide" data-slide="5">
+      <h2>Days 1-3</h2>
+      <div style="display:flex;flex-direction:column;gap:1rem;max-width:900px;width:100%;">
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 1 • March 19</span>
+            <span class="day-miles">0 miles</span>
+          </div>
+          <div class="day-title">Arrival & Meet in Temecula</div>
+          <div class="day-route">Orientation, bike checks, welcome dinner</div>
+        </div>
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 2 • March 20</span>
+            <span class="day-miles">273 miles • 6 hrs</span>
+          </div>
+          <div class="day-title">Temecula → Rancho Meling</div>
+          <div class="day-route">Tecate border crossing, Valle de Guadalupe wine country</div>
+        </div>
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 3 • March 21</span>
+            <span class="day-miles">343 miles • 7 hrs</span>
+          </div>
+          <div class="day-title">Rancho Meling → Laguna Ojo de Liebre</div>
+          <div class="day-route">Vizcaíno Desert, gray whale sanctuary camping</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 6: Days 4-6 -->
+    <div class="slide" data-slide="6">
+      <h2>Days 4-6</h2>
+      <div style="display:flex;flex-direction:column;gap:1rem;max-width:900px;width:100%;">
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 4 • March 22</span>
+            <span class="day-miles">197 miles • 4.25 hrs</span>
+          </div>
+          <div class="day-title">Whale Lagoon → Playa El Burro</div>
+          <div class="day-route">San Ignacio, Cuesta del Infierno, Bahía Concepción beaches</div>
+        </div>
+        <div class="day-card" style="border-color:#fbbf24;">
+          <div class="day-header">
+            <span class="day-number" style="color:#fbbf24;">DAY 5 • March 23 • REST DAY</span>
+            <span class="day-miles">Optional rides</span>
+          </div>
+          <div class="day-title">Bahía Concepción - Beach Day</div>
+          <div class="day-route">Relax, kayak, snorkel, or ride to Mulegé, Loreto, or Mission San Javier</div>
+        </div>
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 6 • March 24</span>
+            <span class="day-miles">311 miles • 6.5 hrs</span>
+          </div>
+          <div class="day-title">Playa El Burro → Bahía de los Ángeles</div>
+          <div class="day-route">Remote fishing village on the Sea of Cortez</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 7: Days 7-9 -->
+    <div class="slide" data-slide="7">
+      <h2>Days 7-9</h2>
+      <div style="display:flex;flex-direction:column;gap:1rem;max-width:900px;width:100%;">
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 7 • March 25</span>
+            <span class="day-miles">390 miles • 7.5 hrs</span>
+          </div>
+          <div class="day-title">Bahía de los Ángeles → Tecate</div>
+          <div class="day-route">Gonzaga Bay, San Felipe, La Rumorosa Grade • 4-star hotel!</div>
+        </div>
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 8 • March 26</span>
+            <span class="day-miles">200 miles • 4.25 hrs</span>
+          </div>
+          <div class="day-title">Tecate → Twentynine Palms</div>
+          <div class="day-route">Border crossing, Julian, Anza-Borrego, Joshua Tree NP</div>
+        </div>
+        <div class="day-card">
+          <div class="day-header">
+            <span class="day-number">DAY 9 • March 27</span>
+            <span class="day-miles">240 miles • 4 hrs</span>
+          </div>
+          <div class="day-title">Twentynine Palms → Furnace Creek</div>
+          <div class="day-route">Mojave Preserve, Kelso Dunes, Death Valley finale</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 8: Accommodations -->
+    <div class="slide" data-slide="8">
+      <h2>Accommodations</h2>
+      <table>
+        <tr>
+          <th>Night</th>
+          <th>Location</th>
+          <th>Type</th>
+        </tr>
+        <tr>
+          <td>1</td>
+          <td>Best Western Plus Temecula</td>
+          <td><span class="badge">Hotel</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Rancho Meling</td>
+          <td><span class="badge">Hotel</span><span class="badge-amber badge">Camping</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Laguna Ojo de Liebre</td>
+          <td><span class="badge-amber badge">Camping</span></td>
+        </tr>
+        <tr>
+          <td>4-5</td>
+          <td>Playa El Burro</td>
+          <td><span class="badge-amber badge">Beach Camping</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>Bahía de los Ángeles</td>
+          <td><span class="badge">Hotel</span><span class="badge-amber badge">Camping</span></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>Santuario Diegueño, Tecate</td>
+          <td><span class="badge-green badge">4-Star</span></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>Fairfield Inn, Twentynine Palms</td>
+          <td><span class="badge">Hotel</span></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>Furnace Creek, Death Valley</td>
+          <td><span class="badge-amber badge">Camping</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Slide 9: Required Documents -->
+    <div class="slide" data-slide="9">
+      <h2>Required Documents</h2>
+      <div class="two-col">
+        <div class="col">
+          <h3>📄 Before You Go</h3>
+          <ul>
+            <li>Valid Passport (6+ months validity)</li>
+            <li>Mexican FMM Tourist Card</li>
+            <li>Mexico Motorcycle Insurance</li>
+            <li>US Vehicle Registration</li>
+            <li>Driver's License</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3>💡 Pro Tips</h3>
+          <ul>
+            <li>Apply for FMM online before the trip</li>
+            <li>Your US insurance won't cover you in Mexico</li>
+            <li>Upload copies to the app for easy access</li>
+            <li>Keep FMM safe - you need it to exit Mexico</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 10: Motorcycle Prep -->
+    <div class="slide" data-slide="10">
+      <h2>Motorcycle Preparation</h2>
+      <div class="two-col">
+        <div class="col">
+          <h3>🔧 Service Your Bike</h3>
+          <ul>
+            <li>Fresh oil change</li>
+            <li>Check tire wear & pressure</li>
+            <li>Brake pads & fluid</li>
+            <li>Chain/belt tension</li>
+            <li>Coolant levels</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3>🎒 Recommended Gear</h3>
+          <ul>
+            <li>Tire repair kit & pump</li>
+            <li>Basic tool kit</li>
+            <li>Extra fuel capacity (2+ gal)</li>
+            <li>Phone mount + USB charging</li>
+            <li>First aid kit</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 11: What to Pack -->
+    <div class="slide" data-slide="11">
+      <h2>What to Pack</h2>
+      <div class="card-grid card-grid-3">
+        <div class="card">
+          <h3>🧥 Riding Gear</h3>
+          <ul style="font-size:1rem;">
+            <li style="font-size:1rem;">Helmet, jacket, pants</li>
+            <li style="font-size:1rem;">Boots & gloves</li>
+            <li style="font-size:1rem;">Rain gear</li>
+            <li style="font-size:1rem;">Layers for temp changes</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🏕️ Camping</h3>
+          <ul style="font-size:1rem;">
+            <li style="font-size:1rem;">Tent & stakes</li>
+            <li style="font-size:1rem;">Sleeping bag & pad</li>
+            <li style="font-size:1rem;">Headlamp</li>
+            <li style="font-size:1rem;">Camp chair (optional)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🧴 Personal</h3>
+          <ul style="font-size:1rem;">
+            <li style="font-size:1rem;">Sunscreen & sunglasses</li>
+            <li style="font-size:1rem;">Medications</li>
+            <li style="font-size:1rem;">Cash (pesos & USD)</li>
+            <li style="font-size:1rem;">Toiletries</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 12: Action Items -->
+    <div class="slide" data-slide="12">
+      <h2>Your Action Items</h2>
+      <div class="card" style="max-width:700px;">
+        <ul class="checklist">
+          <li>Complete your <strong>Tour Selections</strong> (accommodations & meals)</li>
+          <li>Upload your <strong>Documents</strong> to the app</li>
+          <li>Apply for <strong>FMM Card</strong> online</li>
+          <li>Purchase <strong>Mexico Insurance</strong></li>
+          <li>Service your motorcycle</li>
+          <li>Submit remaining <strong>balance</strong> by deadline</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Slide 13: Using the Website -->
+    <div class="slide" data-slide="13">
+      <h2>Using the Website</h2>
+      <p style="margin-bottom:2rem;color:#60a5fa;font-size:1.5rem;">bajarun2026.web.app</p>
+      <div class="card-grid">
+        <div class="card">
+          <h3>👤 My Profile</h3>
+          <p style="text-align:left;font-size:1rem;">Update your personal info and emergency contacts</p>
+        </div>
+        <div class="card">
+          <h3>🏨 My Ride</h3>
+          <p style="text-align:left;font-size:1rem;">Select your accommodations and meals for each night</p>
+        </div>
+        <div class="card">
+          <h3>📄 My Documents</h3>
+          <p style="text-align:left;font-size:1rem;">Upload passport, insurance, FMM for easy access</p>
+        </div>
+        <div class="card">
+          <h3>💰 My Ledger</h3>
+          <p style="text-align:left;font-size:1rem;">Track your payments and current balance</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 14: Mobile App -->
+    <div class="slide" data-slide="14">
+      <h2>Mobile App</h2>
+      <div class="icon">📱</div>
+      <p style="margin-bottom:2rem;">Access everything on the go - itinerary, documents, notifications</p>
+      <div style="display:flex;gap:2rem;">
+        <div class="card" style="text-align:center;">
+          <h3>🍎 iOS</h3>
+          <p style="font-size:1rem;">Available on App Store</p>
+        </div>
+        <div class="card" style="text-align:center;">
+          <h3>🤖 Android</h3>
+          <p style="font-size:1rem;">Coming to Play Store</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 15: Important Dates -->
+    <div class="slide" data-slide="15">
+      <h2>Important Dates</h2>
+      <table>
+        <tr>
+          <th>Date</th>
+          <th>Milestone</th>
+        </tr>
+        <tr>
+          <td><span class="badge-amber badge">TBD</span></td>
+          <td>Accommodation selections due</td>
+        </tr>
+        <tr>
+          <td><span class="badge-amber badge">TBD</span></td>
+          <td>Final payment due</td>
+        </tr>
+        <tr>
+          <td><strong>March 19</strong></td>
+          <td>Arrive in Temecula by 4:00 PM</td>
+        </tr>
+        <tr>
+          <td><strong>March 19</strong></td>
+          <td>Welcome dinner & orientation (6:00 PM)</td>
+        </tr>
+        <tr>
+          <td><strong>March 27</strong></td>
+          <td>Tour ends at Death Valley</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Slide 16: Questions -->
+    <div class="slide questions-slide" data-slide="16">
+      <div class="icon">❓</div>
+      <h2>Questions?</h2>
+      <div class="contact-info">
+        <div class="contact-card">
+          <h4>💬 Discussion Forum</h4>
+          <p>Ask on the website</p>
+        </div>
+        <div class="contact-card">
+          <h4>🔔 Announcements</h4>
+          <p>Check the app regularly</p>
+        </div>
+        <div class="contact-card">
+          <h4>🌐 Website</h4>
+          <p>bajarun2026.web.app</p>
+        </div>
+      </div>
+      <p style="margin-top:3rem;font-size:1.75rem;color:#fff;">See you in Temecula! 🏍️</p>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button onclick="prevSlide()">← Previous</button>
+    <button onclick="nextSlide()">Next →</button>
+  </div>
+
+  <div class="slide-counter">
+    <span id="currentSlide">1</span> / <span id="totalSlides">16</span>
+  </div>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 16;
+
+    function showSlide(n) {
+      const slides = document.querySelectorAll('.slide');
+      if (n > totalSlides) currentSlide = 1;
+      if (n < 1) currentSlide = totalSlides;
+
+      slides.forEach(slide => slide.classList.remove('active'));
+      slides[currentSlide - 1].classList.add('active');
+      document.getElementById('currentSlide').textContent = currentSlide;
+    }
+
+    function nextSlide() {
+      currentSlide++;
+      showSlide(currentSlide);
+    }
+
+    function prevSlide() {
+      currentSlide--;
+      showSlide(currentSlide);
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+      }
+    });
+
+    // Touch/swipe support
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    });
+    document.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) nextSlide();
+        else prevSlide();
+      }
+    });
+  </script>
+</body>
+</html>

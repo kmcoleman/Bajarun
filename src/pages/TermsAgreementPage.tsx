@@ -7,7 +7,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -22,8 +22,12 @@ import {
 
 export default function TermsAgreementPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, acceptTerms, termsAccepted, termsConfig } = useAuth();
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+
+  // Get the original URL the user was trying to access
+  const from = (location.state as { from?: string })?.from || '/tours';
   const [isChecked, setIsChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +42,9 @@ export default function TermsAgreementPage() {
   // Redirect if already accepted
   useEffect(() => {
     if (termsAccepted) {
-      navigate('/tours');
+      navigate(from);
     }
-  }, [termsAccepted, navigate]);
+  }, [termsAccepted, navigate, from]);
 
   // Fetch markdown content from Storage
   useEffect(() => {
@@ -98,7 +102,7 @@ export default function TermsAgreementPage() {
 
     try {
       await acceptTerms();
-      navigate('/tours');
+      navigate(from);
     } catch (err) {
       console.error('Error accepting terms:', err);
       setError('Failed to save your acceptance. Please try again.');

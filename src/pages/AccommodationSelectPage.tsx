@@ -50,6 +50,9 @@ export default function AccommodationSelectPage() {
   const [preferredRoommate, setPreferredRoommate] = useState<string>('');
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string>('');
 
+  // Track if user has already submitted selections (read-only after first save)
+  const [hasExistingSelections, setHasExistingSelections] = useState(false);
+
   // Load event config and user selections from Firestore
   useEffect(() => {
     async function loadData() {
@@ -75,6 +78,11 @@ export default function AccommodationSelectPage() {
           const userData = userSnap.data();
           if (userData.accommodationSelections) {
             setUserSelections(userData.accommodationSelections);
+            // Check if they have at least one accommodation selected (means they've submitted before)
+            const hasAnySelection = Object.values(userData.accommodationSelections).some(
+              (sel: any) => sel?.accommodation
+            );
+            setHasExistingSelections(hasAnySelection);
           }
           if (userData.preferredRoommate) {
             setPreferredRoommate(userData.preferredRoommate);
@@ -132,6 +140,9 @@ export default function AccommodationSelectPage() {
 
   // Update a selection for a night
   const updateSelection = (nightKey: string, field: keyof NightSelection, value: AccommodationType | boolean | string | string[] | null) => {
+    // Prevent updates if selections already submitted
+    if (hasExistingSelections) return;
+
     setUserSelections(prev => ({
       ...prev,
       [nightKey]: {
@@ -145,6 +156,9 @@ export default function AccommodationSelectPage() {
 
   // Toggle an optional activity interest
   const toggleOptionalActivity = (nightKey: string, activityId: string) => {
+    // Prevent updates if selections already submitted
+    if (hasExistingSelections) return;
+
     const currentSelection = userSelections[nightKey] || emptyNightSelection;
     const currentInterested = currentSelection.optionalActivitiesInterested || [];
     const newInterested = currentInterested.includes(activityId)
@@ -283,6 +297,19 @@ export default function AccommodationSelectPage() {
           </p>
         </div>
 
+        {/* Read-Only Notice - shown when selections already submitted */}
+        {hasExistingSelections && (
+          <div className="bg-blue-900/30 border border-blue-500/50 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <Check className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-blue-200 font-medium">Your selections have been submitted</p>
+              <p className="text-blue-200/70 text-sm mt-1">
+                Your accommodation and meal selections are locked. If you need to make changes, please contact <a href="mailto:bmwriderkmc@gmail.com" className="underline hover:text-blue-100">bmwriderkmc@gmail.com</a>.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Instructions */}
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6 space-y-6">
           {/* Lodging Details */}
@@ -362,26 +389,28 @@ export default function AccommodationSelectPage() {
             </div>
             <div className="text-xs text-slate-500">Based on current selections</div>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving || (!hasChanges && isComplete)}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-colors ${
-              saveSuccess
-                ? 'bg-green-600 text-white'
-                : hasChanges || !isComplete
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            {saving ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : saveSuccess ? (
-              <Check className="h-5 w-5" />
-            ) : (
-              <Save className="h-5 w-5" />
-            )}
-            {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Selections'}
-          </button>
+          {!hasExistingSelections && (
+            <button
+              onClick={handleSave}
+              disabled={saving || (!hasChanges && isComplete)}
+              className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-colors ${
+                saveSuccess
+                  ? 'bg-green-600 text-white'
+                  : hasChanges || !isComplete
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              {saving ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : saveSuccess ? (
+                <Check className="h-5 w-5" />
+              ) : (
+                <Save className="h-5 w-5" />
+              )}
+              {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Selections'}
+            </button>
+          )}
         </div>
 
         {/* Preferences Section */}
@@ -400,11 +429,13 @@ export default function AccommodationSelectPage() {
             <select
               value={preferredRoommate}
               onChange={(e) => {
+                if (hasExistingSelections) return;
                 setPreferredRoommate(e.target.value);
                 setHasChanges(true);
                 setSaveSuccess(false);
               }}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              disabled={hasExistingSelections}
+              className={`w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${hasExistingSelections ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               <option value="">No preference</option>
               {registeredRiders.map((rider) => (
@@ -429,13 +460,15 @@ export default function AccommodationSelectPage() {
             <textarea
               value={dietaryRestrictions}
               onChange={(e) => {
+                if (hasExistingSelections) return;
                 setDietaryRestrictions(e.target.value);
                 setHasChanges(true);
                 setSaveSuccess(false);
               }}
+              disabled={hasExistingSelections}
               placeholder="e.g., Vegetarian, gluten-free, nut allergy, etc."
               rows={3}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+              className={`w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none ${hasExistingSelections ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
           </div>
         </div>
@@ -917,28 +950,30 @@ export default function AccommodationSelectPage() {
         </div>
 
         {/* Bottom Save Button */}
-        <div className="mt-8 flex justify-end">
-          <button
-            onClick={handleSave}
-            disabled={saving || !hasChanges}
-            className={`flex items-center gap-2 px-8 py-3 font-semibold rounded-lg transition-colors ${
-              saveSuccess
-                ? 'bg-green-600 text-white'
-                : hasChanges
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            {saving ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : saveSuccess ? (
-              <Check className="h-5 w-5" />
-            ) : (
-              <Save className="h-5 w-5" />
-            )}
-            {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Selections'}
-          </button>
-        </div>
+        {!hasExistingSelections && (
+          <div className="mt-8 flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              className={`flex items-center gap-2 px-8 py-3 font-semibold rounded-lg transition-colors ${
+                saveSuccess
+                  ? 'bg-green-600 text-white'
+                  : hasChanges
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              {saving ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : saveSuccess ? (
+                <Check className="h-5 w-5" />
+              ) : (
+                <Save className="h-5 w-5" />
+              )}
+              {saving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Selections'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

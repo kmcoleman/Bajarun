@@ -2,7 +2,7 @@
  * Tour Registration Form - Multi-step registration for a tour
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { db, storage } from '../lib/firebase';
@@ -104,6 +104,46 @@ export default function RegisterTourPage() {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [headshotUri, setHeadshotUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [nameFromProvider, setNameFromProvider] = useState(false);
+
+  // Pre-populate form with user data from Apple/Google sign in
+  // This satisfies Apple's requirement to use data they already provide
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user) return;
+
+      let userName = '';
+
+      // First try Firebase displayName (set by Google/Apple)
+      if (user.displayName) {
+        userName = user.displayName;
+      }
+
+      // If no displayName, check our Firestore users collection for Apple data
+      if (!userName) {
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            if (data.appleFullName) {
+              userName = data.appleFullName;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      }
+
+      // Pre-populate the form if we have a name
+      if (userName && !formData.fullName) {
+        setFormData(prev => ({ ...prev, fullName: userName }));
+        setNameFromProvider(true);
+      }
+    };
+
+    loadUserData();
+  }, [user]);
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));

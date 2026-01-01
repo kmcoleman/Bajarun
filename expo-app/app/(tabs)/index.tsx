@@ -21,6 +21,7 @@ import { itineraryData as defaultItineraryData } from '../../data/itinerary';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, borderRadius } from '../../constants/theme';
 import AlertsDropdown from '../../components/AlertsDropdown';
+import RouteMapView from '../../components/RouteMapView';
 
 export default function TourPage() {
   const { user } = useAuth();
@@ -200,6 +201,16 @@ export default function TourPage() {
               <Text style={styles.mapsButtonText}>Open in Maps</Text>
             </TouchableOpacity>
           )}
+
+          {/* Route Map */}
+          <RouteMapView
+            startCoordinates={mergedDayData.coordinates.start}
+            endCoordinates={mergedDayData.coordinates.end}
+            startName={mergedDayData.startPoint}
+            endName={mergedDayData.endPoint}
+            dayNumber={selectedDay}
+            waypoints={dayData?.waypoints}
+          />
         </View>
 
         {/* Key Highlights */}

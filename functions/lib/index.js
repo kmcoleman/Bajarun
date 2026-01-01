@@ -38,6 +38,9 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -1240,4 +1243,12 @@ exports.seedTours = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError("internal", "Failed to seed tours");
     }
 });
+// ============================================================
+// NEW EMAIL SYSTEM (isolated - delete this line to remove)
+// ============================================================
+__exportStar(require("./emailSystem"), exports);
+// ============================================================
+// ACCOUNT DELETION (App Store requirement)
+// ============================================================
+__exportStar(require("./accountDeletion"), exports);
 //# sourceMappingURL=index.js.map

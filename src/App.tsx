@@ -33,10 +33,14 @@ import TermsOfServicePage from './pages/TermsOfServicePage';
 import ToursPage from './pages/ToursPage';
 import WaitlistPage from './pages/WaitlistPage';
 import SupportPage from './pages/SupportPage';
+import CacheHelpPage from './pages/CacheHelpPage';
 import TermsAgreementPage from './pages/TermsAgreementPage';
 import TourUpdateEmailPage from './pages/TourUpdateEmailPage';
 import RegistrationCleanupPage from './pages/RegistrationCleanupPage';
 import DataIntegrityPage from './pages/DataIntegrityPage';
+import HeadshotsPage from './pages/HeadshotsPage';
+// NEW EMAIL SYSTEM (isolated - delete this line to remove)
+import EmailSystemPage from './pages/EmailSystemPage';
 
 function App() {
   return (
@@ -63,6 +67,9 @@ function App() {
             <Route path="/admin/tour-update-email" element={<TourUpdateEmailPage />} />
             <Route path="/admin/registration-cleanup" element={<RegistrationCleanupPage />} />
             <Route path="/admin/data-integrity" element={<DataIntegrityPage />} />
+            <Route path="/admin/headshots" element={<HeadshotsPage />} />
+            {/* NEW EMAIL SYSTEM (isolated - delete this line to remove) */}
+            <Route path="/admin/email-system" element={<EmailSystemPage />} />
             <Route path="/my-selections" element={<AccommodationSelectPage />} />
             <Route path="/my-documents" element={<RiderDocumentsPage />} />
             <Route path="/my-ledger" element={<MyLedgerPage />} />
@@ -72,6 +79,7 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/support" element={<SupportPage />} />
+            <Route path="/cache-help" element={<CacheHelpPage />} />
             <Route path="/agree" element={<TermsAgreementPage />} />
           </Routes>
         </Layout>

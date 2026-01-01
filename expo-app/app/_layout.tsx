@@ -4,13 +4,26 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
-import { useEffect, useRef } from 'react';
+import Constants from 'expo-constants';
+import { useEffect, useRef, ReactNode } from 'react';
 import 'react-native-reanimated';
 import { ThemeProvider } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
-import { StripeProvider } from '@stripe/stripe-react-native';
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51Se1jvRu02BYXJOrVgBjYomdKj3hpTzJ0XeRGsa569EJtYbQTomzfbgp6XvF5BGFKN35vm3P5yPMRAXDZn44uEJ200RZ6VGam2';
+
+// Check if running in Expo Go (native modules like Stripe won't work)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Conditionally import StripeProvider only for development builds
+let StripeProvider: React.ComponentType<{ publishableKey: string; children: ReactNode }> | null = null;
+if (!isExpoGo) {
+  try {
+    StripeProvider = require('@stripe/stripe-react-native').StripeProvider;
+  } catch (e) {
+    console.log('Stripe not available');
+  }
+}
 
 export {
   ErrorBoundary,
@@ -134,11 +147,20 @@ export default function RootLayout() {
     return null;
   }
 
-  return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-      <ThemeProvider>
-        <RootLayoutNav />
-      </ThemeProvider>
-    </StripeProvider>
+  const content = (
+    <ThemeProvider>
+      <RootLayoutNav />
+    </ThemeProvider>
   );
+
+  // Wrap with StripeProvider only if available (not in Expo Go)
+  if (StripeProvider) {
+    return (
+      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+        {content}
+      </StripeProvider>
+    );
+  }
+
+  return content;
 }

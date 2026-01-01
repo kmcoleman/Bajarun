@@ -297,7 +297,27 @@ export function useAuth() {
       });
 
       // Sign in to Firebase
-      await signInWithCredential(auth, firebaseCredential);
+      const userCredential = await signInWithCredential(auth, firebaseCredential);
+
+      // Apple only provides name on FIRST sign in, so save it if available
+      // This satisfies Apple's requirement to not ask for info they already provide
+      if (credential.fullName?.givenName || credential.fullName?.familyName) {
+        const fullName = [credential.fullName.givenName, credential.fullName.familyName]
+          .filter(Boolean)
+          .join(' ');
+
+        if (fullName) {
+          // Save to Firestore users collection for later use
+          const userDocRef = doc(db, 'users', userCredential.user.uid);
+          await setDoc(userDocRef, {
+            appleFullName: fullName,
+            appleGivenName: credential.fullName.givenName || null,
+            appleFamilyName: credential.fullName.familyName || null,
+            appleEmail: credential.email || null,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        }
+      }
     } catch (error: any) {
       console.error('Apple sign in error:', error);
       // Don't show error if user cancelled
