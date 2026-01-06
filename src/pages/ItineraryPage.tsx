@@ -5,6 +5,8 @@
  * - Day tabs across the top for quick navigation
  * - Selected day's details shown below
  * - Route map, miles, time, accommodations, points of interest
+ *
+ * Data source: Firestore events/bajarun2026/routes/day{N}
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -16,18 +18,46 @@ import {
   Star,
   Calendar,
   Tent,
-  ExternalLink,
   Info,
   Map,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  ExternalLink,
+  Phone
 } from 'lucide-react';
-import { itineraryData, tripSummary, totalMiles, type DayItinerary } from '../data/itinerary';
+import { useRoutes, calculateTripSummary } from '../hooks/useRoutes';
+import type { RouteConfig } from '../types/routeConfig';
+import ReactMarkdown from 'react-markdown';
+import type { NightConfig } from '../types/eventConfig';
+import { db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import RouteMap from '../components/RouteMap';
 
 export default function ItineraryPage() {
+  const { routes, loading, error } = useRoutes();
   const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [nightConfigs, setNightConfigs] = useState<{ [key: string]: NightConfig }>({});
   const tabsRef = useRef<HTMLDivElement>(null);
+
+  // Fetch pricing/accommodation data
+  useEffect(() => {
+    async function loadPricingData() {
+      try {
+        const configRef = doc(db, 'eventConfig', 'pricing');
+        const configSnap = await getDoc(configRef);
+        if (configSnap.exists()) {
+          const data = configSnap.data();
+          if (data.nights) {
+            setNightConfigs(data.nights);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading pricing data:', err);
+      }
+    }
+    loadPricingData();
+  }, []);
 
   // Navigate to previous/next day
   const goToPrevDay = () => {
@@ -37,7 +67,7 @@ export default function ItineraryPage() {
   };
 
   const goToNextDay = () => {
-    if (selectedDay < itineraryData.length) {
+    if (selectedDay < routes.length) {
       setSelectedDay(selectedDay + 1);
     }
   };
@@ -52,7 +82,31 @@ export default function ItineraryPage() {
     }
   }, [selectedDay]);
 
-  const currentDay = itineraryData.find(d => d.day === selectedDay) || itineraryData[0];
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen py-8 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-400 mx-auto mb-4" />
+          <p className="text-slate-400">Loading itinerary...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error || routes.length === 0) {
+    return (
+      <div className="min-h-screen py-8 flex items-center justify-center">
+        <div className="text-center text-red-400">
+          <p>{error || 'No routes found'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const tripSummary = calculateTripSummary(routes);
+  const currentDay = routes.find(d => d.day === selectedDay) || routes[0];
 
   return (
     <div className="min-h-screen py-8">
@@ -72,7 +126,7 @@ export default function ItineraryPage() {
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <Milestone className="h-5 w-5 text-blue-400" />
-              <span>{totalMiles.toLocaleString()} total miles</span>
+              <span>{tripSummary.totalMiles.toLocaleString()} total miles</span>
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <Hotel className="h-5 w-5 text-blue-400" />
@@ -108,9 +162,10 @@ export default function ItineraryPage() {
               className="flex-1 flex gap-2 overflow-x-auto scrollbar-hide py-1"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              {itineraryData.map((day) => {
+              {routes.map((day) => {
                 const isSelected = selectedDay === day.day;
-                const isRestDay = day.miles === 0;
+                const miles = day.estimatedDistance || 0;
+                const isRestDay = miles === 0;
 
                 return (
                   <button
@@ -128,7 +183,7 @@ export default function ItineraryPage() {
                     <div className="text-center">
                       <div className="text-lg font-bold">Day {day.day}</div>
                       <div className="text-xs opacity-80 whitespace-nowrap">
-                        {day.miles > 0 ? `${day.miles} mi` : 'Rest'}
+                        {miles > 0 ? `${miles} mi` : 'Rest'}
                       </div>
                     </div>
                   </button>
@@ -139,7 +194,7 @@ export default function ItineraryPage() {
             {/* Next Button */}
             <button
               onClick={goToNextDay}
-              disabled={selectedDay === itineraryData.length}
+              disabled={selectedDay === routes.length}
               className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
             >
               <ChevronRight className="h-5 w-5 text-white" />
@@ -148,19 +203,32 @@ export default function ItineraryPage() {
         </div>
 
         {/* Selected Day Content */}
-        <DayContent day={currentDay} onDayClick={setSelectedDay} />
+        <DayContent
+          day={currentDay}
+          onDayClick={setSelectedDay}
+          nightConfig={nightConfigs[`night-${selectedDay}`]}
+        />
       </div>
     </div>
   );
 }
 
 interface DayContentProps {
-  day: DayItinerary;
+  day: RouteConfig;
   onDayClick: (day: number) => void;
+  nightConfig?: NightConfig;
 }
 
-function DayContent({ day, onDayClick }: DayContentProps) {
-  const isRestDay = day.miles === 0;
+function DayContent({ day, onDayClick, nightConfig }: DayContentProps) {
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const miles = day.estimatedDistance || 0;
+  const isRestDay = miles === 0;
+  const description = day.rideSummary || day.description;
+
+  // Reset expanded state when day changes
+  useEffect(() => {
+    setIsDescriptionExpanded(false);
+  }, [day.day]);
 
   return (
     <div className="space-y-6">
@@ -190,7 +258,43 @@ function DayContent({ day, onDayClick }: DayContentProps) {
               )}
             </div>
             <p className="text-slate-400 mt-1">{day.date}</p>
-            <p className="text-slate-300 mt-3">{day.description}</p>
+
+            {/* Description with expand/collapse and markdown support */}
+            {description && (
+              <div className="mt-3">
+                <div className={`text-slate-300 ${!isDescriptionExpanded ? 'line-clamp-3' : ''}`}>
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => <h1 className="text-xl font-bold text-white mt-4 mb-2">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-lg font-bold text-white mt-3 mb-2">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-base font-semibold text-white mt-2 mb-1">{children}</h3>,
+                      h4: ({ children }) => <h4 className="text-sm font-semibold text-slate-200 mt-2 mb-1">{children}</h4>,
+                      p: ({ children }) => <p className="my-2">{children}</p>,
+                      strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
+                      em: ({ children }) => <em className="text-slate-200">{children}</em>,
+                      ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
+                      li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                      a: ({ href, children }) => (
+                        <a href={href} className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {description}
+                  </ReactMarkdown>
+                </div>
+                {description.length > 200 && (
+                  <button
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="text-blue-400 hover:text-blue-300 text-sm mt-2 transition-colors"
+                  >
+                    {isDescriptionExpanded ? 'Show less' : 'Read more'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -222,7 +326,7 @@ function DayContent({ day, onDayClick }: DayContentProps) {
                 </div>
                 <div>
                   <div className="text-sm text-slate-400">From</div>
-                  <div className="text-white font-medium">{day.startPoint}</div>
+                  <div className="text-white font-medium">{day.startName}</div>
                 </div>
               </div>
 
@@ -232,7 +336,7 @@ function DayContent({ day, onDayClick }: DayContentProps) {
                 </div>
                 <div>
                   <div className="text-sm text-slate-400">To</div>
-                  <div className="text-white font-medium">{day.endPoint}</div>
+                  <div className="text-white font-medium">{day.endName}</div>
                 </div>
               </div>
             </div>
@@ -246,7 +350,7 @@ function DayContent({ day, onDayClick }: DayContentProps) {
                 Distance
               </div>
               <div className="text-xl font-bold text-white">
-                {day.miles > 0 ? `${day.miles} mi` : 'Rest'}
+                {miles > 0 ? `${miles} mi` : 'Rest'}
               </div>
             </div>
 
@@ -255,7 +359,7 @@ function DayContent({ day, onDayClick }: DayContentProps) {
                 <Clock className="h-4 w-4" />
                 Riding Time
               </div>
-              <div className="text-xl font-bold text-white">{day.ridingTime}</div>
+              <div className="text-xl font-bold text-white">{day.estimatedTime || 'N/A'}</div>
             </div>
           </div>
 
@@ -275,49 +379,112 @@ function DayContent({ day, onDayClick }: DayContentProps) {
               )}
               <span className="font-semibold text-white text-base">Accommodation</span>
             </div>
-            <div className="text-white">{day.accommodation}</div>
-            {day.accommodationLinks && day.accommodationLinks.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-slate-700 space-y-2">
-                {day.accommodationLinks.map((link, index) => (
-                  <a
-                    key={index}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-sm"
-                  >
-                    {link.type === 'camping' ? (
-                      <Tent className="h-4 w-4" />
+
+            {/* Hotel Info */}
+            {nightConfig?.hotelAvailable && nightConfig.hotelName && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-blue-400" />
+                  {nightConfig.hotelWebsite ? (
+                    <a
+                      href={nightConfig.hotelWebsite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white font-medium hover:text-blue-400 transition-colors flex items-center gap-1"
+                    >
+                      {nightConfig.hotelName}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-white font-medium">{nightConfig.hotelName}</span>
+                  )}
+                </div>
+                {nightConfig.hotelAddress && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                    {nightConfig.hotelMapsLink ? (
+                      <a
+                        href={nightConfig.hotelMapsLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-300 hover:text-blue-400 transition-colors"
+                      >
+                        {nightConfig.hotelAddress}
+                      </a>
                     ) : (
-                      <Hotel className="h-4 w-4" />
+                      <span className="text-slate-300">{nightConfig.hotelAddress}</span>
                     )}
-                    <span>{link.name}</span>
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                ))}
+                  </div>
+                )}
+                {nightConfig.hotelPhone && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-slate-400" />
+                    <a
+                      href={`tel:${nightConfig.hotelPhone}`}
+                      className="text-slate-300 hover:text-blue-400 transition-colors"
+                    >
+                      {nightConfig.hotelPhone}
+                    </a>
+                  </div>
+                )}
+                {nightConfig.hotelDescription && (
+                  <p className="text-sm text-slate-400 mt-2">{nightConfig.hotelDescription}</p>
+                )}
               </div>
+            )}
+
+            {/* Camping Info */}
+            {nightConfig?.campingAvailable && nightConfig.campingName && (
+              <div className={`space-y-2 ${nightConfig?.hotelAvailable && nightConfig.hotelName ? 'mt-4 pt-4 border-t border-slate-700' : ''}`}>
+                <div className="flex items-center gap-2">
+                  <Tent className="h-4 w-4 text-green-400" />
+                  {nightConfig.campingMapsLink ? (
+                    <a
+                      href={nightConfig.campingMapsLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white font-medium hover:text-green-400 transition-colors flex items-center gap-1"
+                    >
+                      {nightConfig.campingName}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-white font-medium">{nightConfig.campingName}</span>
+                  )}
+                </div>
+                {nightConfig.campingDescription && (
+                  <p className="text-sm text-slate-400">{nightConfig.campingDescription}</p>
+                )}
+              </div>
+            )}
+
+            {/* Fallback if no accommodation info */}
+            {(!nightConfig || (!nightConfig.hotelAvailable && !nightConfig.campingAvailable)) && (
+              <div className="text-white">{day.accommodation || 'TBD'}</div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Points of Interest */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <div className="flex items-center gap-2 text-slate-400 text-sm mb-4">
-          <Star className="h-5 w-5 text-amber-400" />
-          <span className="font-semibold text-white text-lg">Points of Interest</span>
+      {/* Highlights */}
+      {nightConfig?.highlights && nightConfig.highlights.length > 0 && (
+        <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+          <div className="flex items-center gap-2 text-slate-400 text-sm mb-4">
+            <Star className="h-5 w-5 text-amber-400" />
+            <span className="font-semibold text-white text-lg">Highlights</span>
+          </div>
+          <ul className="grid sm:grid-cols-2 gap-3">
+            {nightConfig.highlights.map((highlight, index) => (
+              <li key={index} className="flex items-start gap-3 text-slate-300">
+                <span className="w-6 h-6 rounded-full bg-amber-600/20 flex items-center justify-center flex-shrink-0 text-amber-400 text-sm font-medium">
+                  {index + 1}
+                </span>
+                <span className="font-medium">{highlight}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="grid sm:grid-cols-2 gap-3">
-          {day.pointsOfInterest.map((poi, index) => (
-            <li key={index} className="flex items-start gap-3 text-slate-300">
-              <span className="w-6 h-6 rounded-full bg-amber-600/20 flex items-center justify-center flex-shrink-0 text-amber-400 text-sm font-medium">
-                {index + 1}
-              </span>
-              <span>{poi}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      )}
     </div>
   );
 }

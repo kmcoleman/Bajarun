@@ -29,17 +29,20 @@ export interface Participant {
 
 export interface NightConfig {
   night: number;
+  // Hotel accommodation
   hotelName?: string;
   hotelAddress?: string;
   hotelPhone?: string;
   hotelWebsite?: string;
   hotelMapsLink?: string;
   hotelDescription?: string;
+  // Camping accommodation
   campingName?: string;
   campingMapsLink?: string;
+  // External route file links (GPX downloads, etc.)
+  routeLinks?: Array<{ name: string; url: string; type?: string }>;
   gpxFileUrl?: string;
   reverRouteUrl?: string;
-  [key: string]: unknown;
 }
 
 export type EventConfig = Record<string, NightConfig>;
@@ -79,13 +82,7 @@ export interface RiderDocuments {
   americanInsurance?: DocumentInfo;
 }
 
-// Itinerary types
-export interface AccommodationLink {
-  name: string;
-  url: string;
-  type: 'camping' | 'hotel';
-}
-
+// Route types
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -101,7 +98,18 @@ export interface POI {
   hours?: string;
 }
 
+export interface RouteGeometry {
+  type: 'LineString';
+  coordinates: [number, number][];
+}
+
 export interface RouteConfig {
+  // Day info
+  day: number;
+  date: string;
+  title: string;
+  description: string;
+  // Route
   startCoordinates: Coordinates;
   startName: string;
   endCoordinates: Coordinates;
@@ -110,28 +118,10 @@ export interface RouteConfig {
   pois: POI[];
   estimatedDistance?: number;
   estimatedTime?: string;
-}
-
-export interface DayItinerary {
-  day: number;
-  date: string;
-  title: string;
-  description: string;
-  miles: number;
-  ridingTime: string;
-  startPoint: string;
-  endPoint: string;
-  accommodation: string;
-  accommodationType: 'hotel' | 'camping' | 'mixed';
-  accommodationLinks?: AccommodationLink[];
-  pointsOfInterest: string[];
-  coordinates: {
-    start: [number, number];
-    end: [number, number];
-  };
-  waypoints?: [number, number][];
-  // Extended fields from Firestore NightConfig
-  routeConfig?: RouteConfig;
+  routeGeometry?: RouteGeometry;
+  // Accommodation
+  accommodation?: string;
+  accommodationType?: 'hotel' | 'camping' | 'mixed';
 }
 
 // Sync all data from Firestore
@@ -149,6 +139,7 @@ export async function syncAllData(userId: string, force = false): Promise<void> 
     await Promise.all([
       syncRoster(),
       syncEventConfig(),
+      syncRoutes(),
       syncUserSelections(userId),
       syncUserProfile(userId),
       syncAnnouncements(),
@@ -199,7 +190,7 @@ async function syncRoster(): Promise<void> {
   }
 }
 
-// Sync event config (nightly info)
+// Sync event config (nightly info - pricing/accommodation)
 async function syncEventConfig(): Promise<void> {
   try {
     const docRef = doc(db, 'eventConfig', 'pricing');
@@ -212,6 +203,28 @@ async function syncEventConfig(): Promise<void> {
     }
   } catch (error) {
     console.error('Error syncing event config:', error);
+  }
+}
+
+// Sync routes from events/bajarun2026/routes (SINGLE SOURCE OF TRUTH)
+async function syncRoutes(): Promise<void> {
+  try {
+    const routesRef = collection(db, 'events', 'bajarun2026', 'routes');
+    const snapshot = await getDocs(routesRef);
+    const routes: RouteConfig[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as RouteConfig;
+      routes.push(data);
+    });
+
+    // Sort by day
+    routes.sort((a, b) => a.day - b.day);
+
+    await setData(STORAGE_KEYS.ROUTES, routes);
+    console.log(`Synced ${routes.length} routes`);
+  } catch (error) {
+    console.error('Error syncing routes:', error);
   }
 }
 
@@ -329,6 +342,11 @@ export async function getCachedRoster(): Promise<Participant[]> {
 // Get cached event config
 export async function getCachedEventConfig(): Promise<EventConfig | null> {
   return (await getData<EventConfig>(STORAGE_KEYS.EVENT_CONFIG)) || null;
+}
+
+// Get cached routes
+export async function getCachedRoutes(): Promise<RouteConfig[]> {
+  return (await getData<RouteConfig[]>(STORAGE_KEYS.ROUTES)) || [];
 }
 
 // Get cached user selections

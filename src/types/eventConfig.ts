@@ -16,6 +16,9 @@ export interface NightConfig {
   date: string;  // "2026-03-19"
   nightSummary: string;  // General overview/notes for this night
 
+  // Day info (for mobile app display)
+  highlights: string[];  // Text-based ride features (not map POIs)
+
   // Hotel configuration
   hotelAvailable: boolean;
   hotelName: string;
@@ -25,6 +28,7 @@ export interface NightConfig {
   hotelMapsLink: string;
   hotelDescription: string;
   hotelCost: number;  // per person (assumes double occupancy)
+  hotelCapacity: number;  // max number of people (0 = unlimited)
   hotelOptions: string;  // any options to ask about
 
   // Camping configuration
@@ -82,6 +86,7 @@ export interface EventPricing {
 export const emptyNightConfig: NightConfig = {
   date: '',
   nightSummary: '',
+  highlights: [],
   hotelAvailable: false,
   hotelName: '',
   hotelAddress: '',
@@ -90,6 +95,7 @@ export const emptyNightConfig: NightConfig = {
   hotelMapsLink: '',
   hotelDescription: '',
   hotelCost: 0,
+  hotelCapacity: 0,
   hotelOptions: '',
   campingAvailable: false,
   campingName: '',
@@ -204,4 +210,5 @@ export const TRIP_NIGHTS = [
   { key: 'night-6', date: '2026-03-24', label: 'Night 6 - March 24', location: 'TBD' },
   { key: 'night-7', date: '2026-03-25', label: 'Night 7 - March 25', location: 'TBD' },
   { key: 'night-8', date: '2026-03-26', label: 'Night 8 - March 26', location: 'TBD' },
+  { key: 'night-9', date: '2026-03-27', label: 'Night 9 - March 27', location: 'TBD' },
 ];

@@ -48,7 +48,7 @@ export interface EventDay {
   waypoints?: Coordinates[];
 
   // Points of interest (text descriptions)
-  pointsOfInterest: string[];
+  highlights: string[];
 
   // Accommodation info (display only - pricing is in nightConfigs)
   accommodationSummary: string;   // "Shared Room ($55-70 PP) or Camping ($15)"
@@ -153,7 +153,7 @@ export function legacyDayToEventDay(
     accommodation: string;
     accommodationType: 'hotel' | 'camping' | 'mixed';
     accommodationLinks?: AccommodationLink[];
-    pointsOfInterest: string[];
+    highlights: string[];
     coordinates: { start: [number, number]; end: [number, number] };
     waypoints?: [number, number][];
   },
@@ -174,7 +174,7 @@ export function legacyDayToEventDay(
       end: { lat: legacyDay.coordinates.end[0], lng: legacyDay.coordinates.end[1] },
     },
     waypoints: legacyDay.waypoints?.map(wp => ({ lat: wp[0], lng: wp[1] })),
-    pointsOfInterest: legacyDay.pointsOfInterest,
+    highlights: legacyDay.highlights,
     accommodationSummary: legacyDay.accommodation,
     accommodationType: legacyDay.accommodationType,
     accommodationLinks: legacyDay.accommodationLinks,

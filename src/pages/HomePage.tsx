@@ -30,7 +30,7 @@ import {
   Bell,
   Image
 } from 'lucide-react';
-import { tripSummary, totalMiles } from '../data/itinerary';
+import { useRoutes, calculateTripSummary } from '../hooks/useRoutes';
 
 export default function HomePage() {
   const [daysUntil, setDaysUntil] = useState(0);
@@ -41,6 +41,11 @@ export default function HomePage() {
   const [milesCount, setMilesCount] = useState(0);
   const [daysCount, setDaysCount] = useState(0);
   const [ridingDaysCount, setRidingDaysCount] = useState(0);
+
+  // Fetch routes from Firestore
+  const { routes } = useRoutes();
+  const tripSummary = calculateTripSummary(routes);
+  const totalMiles = tripSummary.totalMiles;
 
   const statsRef = useRef<HTMLElement>(null);
   const aboutRef = useRef<HTMLElement>(null);
@@ -107,8 +112,11 @@ export default function HomePage() {
     return () => fadeObserver.disconnect();
   }, []);
 
-  // Animated counters
+  // Animated counters - wait for routes to load
   useEffect(() => {
+    // Don't animate until routes are loaded
+    if (routes.length === 0) return;
+
     const counterObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting && !countersAnimated) {
@@ -165,7 +173,7 @@ export default function HomePage() {
     }
 
     return () => counterObserver.disconnect();
-  }, [countersAnimated]);
+  }, [countersAnimated, routes.length, totalMiles, tripSummary.totalDays, tripSummary.ridingDays]);
 
   return (
     <div className="min-h-screen -mt-16">
@@ -645,14 +653,14 @@ export default function HomePage() {
               {/* App Store Badges */}
               <div className="flex flex-wrap gap-4 pt-4">
                 <a
-                  href="https://apps.apple.com/app/baja-run-2026/id6740092091"
+                  href="https://play.google.com/store/apps/details?id=com.ncmotoadv.bajarun"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="transition-transform hover:scale-105"
                 >
                   <img
-                    src="/app-store-badge.svg"
-                    alt="Download on the App Store"
+                    src="/google-play-badge.png"
+                    alt="Get it on Google Play"
                     className="h-12"
                   />
                 </a>
@@ -662,12 +670,12 @@ export default function HomePage() {
                   title="Coming Soon"
                 >
                   <img
-                    src="/google-play-badge.png"
-                    alt="Get it on Google Play"
+                    src="/app-store-badge.svg"
+                    alt="Download on the App Store"
                     className="h-12"
                   />
                 </a>
-                <span className="text-slate-500 text-sm self-center">(Android coming soon)</span>
+                <span className="text-slate-500 text-sm self-center">(iOS coming soon)</span>
               </div>
             </div>
 

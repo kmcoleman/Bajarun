@@ -3,16 +3,38 @@
  *
  * Interactive Mapbox map showing the Baja tour route.
  * Displays markers for each day's start/end points and draws route lines.
- * Uses Mapbox Directions API to show actual road routes.
+ *
+ * Data source: Firestore events/bajarun2026/routes/day{N}
+ * Uses pre-calculated route geometry when available, falls back to Mapbox Directions API.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { itineraryData, type DayItinerary } from '../data/itinerary';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
-import type { POI, RouteConfig } from '../types/routeConfig';
+import type { POI, RouteConfig, FirestoreCoordinate } from '../types/routeConfig';
 import { POI_CATEGORIES } from '../types/routeConfig';
+
+// Convert Firestore route data (coordinates as objects) to RouteConfig (coordinates as arrays)
+function convertFirestoreRoute(data: Record<string, unknown>): RouteConfig {
+  const route = { ...data } as unknown as RouteConfig;
+
+  // Convert routeGeometry coordinates from {lng, lat} objects to [lng, lat] arrays
+  if (route.routeGeometry?.coordinates) {
+    const coords = route.routeGeometry.coordinates;
+    // Check if coordinates are stored as objects (Firestore format)
+    if (coords.length > 0 && typeof coords[0] === 'object' && !Array.isArray(coords[0])) {
+      route.routeGeometry = {
+        type: 'LineString',
+        coordinates: (coords as unknown as FirestoreCoordinate[]).map(
+          (c) => [c.lng, c.lat] as [number, number]
+        ),
+      };
+    }
+  }
+
+  return route;
+}
 
 // Mapbox access token - set in environment variable
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -41,47 +63,63 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [allRoutes, setAllRoutes] = useState<RouteConfig[]>([]);
   const [allPOIs, setAllPOIs] = useState<Array<POI & { dayNumber: number }>>([]);
 
   // Check if token is available
   const hasToken = !!mapboxgl.accessToken;
 
-  // Load POIs from all days (public access)
+  // Load all route data from Firestore (including geometry and POIs)
   useEffect(() => {
-    async function loadAllPOIs() {
-      console.log('Loading POIs from Firestore...');
+    async function loadAllRoutes() {
+      console.log('Loading routes from Firestore...');
       try {
         const routesRef = collection(db, 'events', 'bajarun2026', 'routes');
         const snapshot = await getDocs(routesRef);
+        const routes: RouteConfig[] = [];
         const pois: Array<POI & { dayNumber: number }> = [];
 
         console.log('Found', snapshot.size, 'route documents');
 
         snapshot.forEach((doc) => {
-          const dayMatch = doc.id.match(/day(\d+)/);
-          if (dayMatch) {
-            const dayNum = parseInt(dayMatch[1], 10);
-            const routeConfig = doc.data() as RouteConfig;
-            if (routeConfig.pois && routeConfig.pois.length > 0) {
-              console.log('Day', dayNum, 'has', routeConfig.pois.length, 'POIs');
-              routeConfig.pois.forEach(poi => {
-                if (poi.coordinates?.lat && poi.coordinates?.lng) {
-                  pois.push({ ...poi, dayNumber: dayNum });
-                }
-              });
-            }
+          const routeConfig = convertFirestoreRoute(doc.data() as Record<string, unknown>);
+          routes.push(routeConfig);
+
+          // Extract POIs
+          if (routeConfig.pois && routeConfig.pois.length > 0) {
+            console.log('Day', routeConfig.day, 'has', routeConfig.pois.length, 'POIs');
+            routeConfig.pois.forEach(poi => {
+              if (poi.coordinates?.lat && poi.coordinates?.lng) {
+                pois.push({ ...poi, dayNumber: routeConfig.day });
+              }
+            });
           }
         });
 
+        // Sort by day
+        routes.sort((a, b) => a.day - b.day);
+
+        console.log('Total routes loaded:', routes.length);
         console.log('Total POIs loaded:', pois.length);
+        console.log('Routes with geometry:', routes.filter(r => r.routeGeometry).length);
+
+        setAllRoutes(routes);
         setAllPOIs(pois);
       } catch (error) {
-        console.error('Error loading POIs:', error);
+        console.error('Error loading routes:', error);
       }
     }
 
-    loadAllPOIs();
+    loadAllRoutes();
   }, []);
+
+  // Add route and markers when map is loaded and routes are available
+  useEffect(() => {
+    if (!map.current || !mapLoaded || allRoutes.length === 0) return;
+
+    console.log('Adding route and markers from', allRoutes.length, 'days');
+    addRouteAndMarkers();
+  }, [mapLoaded, allRoutes]);
 
   // Add POI markers when map is loaded and POIs are available
   useEffect(() => {
@@ -208,7 +246,7 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
 
       map.current.on('load', () => {
         setMapLoaded(true);
-        addRouteAndMarkers();
+        // Route will be added when allRoutes is populated
       });
 
       map.current.on('error', (e) => {
@@ -274,40 +312,68 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
 
   // Add route line and markers
   const addRouteAndMarkers = async () => {
-    if (!map.current) return;
+    if (!map.current || allRoutes.length === 0) return;
 
     setRouteLoading(true);
 
-    // Create waypoint coordinates from itinerary (unique locations only)
-    const waypoints: [number, number][] = [];
+    // Check if we have stored geometry
+    const routesWithGeometry = allRoutes.filter(r => r.routeGeometry?.coordinates?.length);
+    const hasStoredGeometry = routesWithGeometry.length > 0;
 
-    itineraryData.forEach((day) => {
-      // Add any intermediate waypoints for this day
-      if (day.waypoints && day.waypoints.length > 0) {
-        day.waypoints.forEach(wp => {
-          const wpCoord: [number, number] = [wp[1], wp[0]]; // Convert [lat, lng] to [lng, lat] for Mapbox
-          waypoints.push(wpCoord);
-        });
+    let routeCoordinates: [number, number][] = [];
+
+    if (hasStoredGeometry) {
+      // Use stored geometry - combine all route segments
+      console.log('Using stored route geometry from', routesWithGeometry.length, 'routes');
+      routesWithGeometry.forEach(route => {
+        if (route.routeGeometry?.coordinates) {
+          // Avoid duplicating connection points
+          if (routeCoordinates.length > 0) {
+            routeCoordinates.push(...route.routeGeometry.coordinates.slice(1));
+          } else {
+            routeCoordinates.push(...route.routeGeometry.coordinates);
+          }
+        }
+      });
+    } else {
+      // Fallback: fetch from Mapbox Directions API
+      console.log('No stored geometry, fetching from Mapbox API');
+      const waypoints: [number, number][] = [];
+
+      allRoutes.forEach((route) => {
+        // Add any intermediate waypoints
+        if (route.waypoints && route.waypoints.length > 0) {
+          route.waypoints.forEach(wp => {
+            waypoints.push([wp.lng, wp.lat]);
+          });
+        }
+
+        // Add end point
+        if (route.endCoordinates) {
+          const endCoord: [number, number] = [route.endCoordinates.lng, route.endCoordinates.lat];
+          if (waypoints.length === 0 ||
+              waypoints[waypoints.length - 1][0] !== endCoord[0] ||
+              waypoints[waypoints.length - 1][1] !== endCoord[1]) {
+            waypoints.push(endCoord);
+          }
+        }
+      });
+
+      routeCoordinates = await fetchDrivingRoute(waypoints);
+
+      // Fallback to straight lines if API fails
+      if (routeCoordinates.length === 0) {
+        console.warn('Directions API failed, using straight lines');
+        routeCoordinates = waypoints;
       }
+    }
 
-      // Add end point of each day (which is the destination)
-      const endCoord: [number, number] = [day.coordinates.end[1], day.coordinates.end[0]];
-
-      // Only add if different from last waypoint
-      if (waypoints.length === 0 ||
-          waypoints[waypoints.length - 1][0] !== endCoord[0] ||
-          waypoints[waypoints.length - 1][1] !== endCoord[1]) {
-        waypoints.push(endCoord);
-      }
-    });
-
-    // Fetch actual driving route
-    let routeCoordinates = await fetchDrivingRoute(waypoints);
-
-    // Fallback to straight lines if directions API fails
-    if (routeCoordinates.length === 0) {
-      console.warn('Directions API failed, using straight lines');
-      routeCoordinates = waypoints;
+    // Remove existing route if present
+    if (map.current.getLayer('route')) {
+      map.current.removeLayer('route');
+    }
+    if (map.current.getSource('route')) {
+      map.current.removeSource('route');
     }
 
     // Add route line
@@ -341,13 +407,14 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
     // Add markers for each unique location
     const addedLocations = new Set<string>();
 
-    itineraryData.forEach((day) => {
-      const endKey = `${day.coordinates.end[0]},${day.coordinates.end[1]}`;
+    allRoutes.forEach((route) => {
+      if (!route.endCoordinates) return;
+      const endKey = `${route.endCoordinates.lat},${route.endCoordinates.lng}`;
 
       // Only add marker if we haven't added one for this location
       if (!addedLocations.has(endKey)) {
         addedLocations.add(endKey);
-        addMarker(day);
+        addMarker(route);
       }
     });
 
@@ -355,19 +422,20 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
   };
 
   // Add a marker for a day
-  const addMarker = (day: DayItinerary) => {
-    if (!map.current) return;
+  const addMarker = (route: RouteConfig) => {
+    if (!map.current || !route.endCoordinates) return;
 
-    const isRestDay = day.miles === 0 && day.day !== 1;
-    const isStart = day.day === 1;
-    const isEnd = day.day === itineraryData.length;
+    const miles = route.estimatedDistance || 0;
+    const isRestDay = miles === 0 && route.day !== 1;
+    const isStart = route.day === 1;
+    const isEnd = route.day === allRoutes.length;
 
     // Create custom marker element
     const el = document.createElement('div');
     el.className = 'route-marker';
     el.innerHTML = `
       <div class="marker-container ${isStart ? 'marker-start' : isEnd ? 'marker-end' : isRestDay ? 'marker-rest' : 'marker-default'}">
-        <span class="marker-day">${day.day}</span>
+        <span class="marker-day">${route.day}</span>
       </div>
     `;
 
@@ -378,22 +446,22 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
       className: 'route-popup'
     }).setHTML(`
       <div class="popup-content">
-        <h3 class="popup-title">Day ${day.day}: ${day.title}</h3>
-        <p class="popup-location">${day.endPoint}</p>
-        ${day.miles > 0 ? `<p class="popup-miles">${day.miles} miles</p>` : '<p class="popup-rest">Rest Day</p>'}
+        <h3 class="popup-title">Day ${route.day}: ${route.title}</h3>
+        <p class="popup-location">${route.endName}</p>
+        ${miles > 0 ? `<p class="popup-miles">${miles} miles</p>` : '<p class="popup-rest">Rest Day</p>'}
       </div>
     `);
 
     // Create marker
     const marker = new mapboxgl.Marker(el)
-      .setLngLat([day.coordinates.end[1], day.coordinates.end[0]])
+      .setLngLat([route.endCoordinates.lng, route.endCoordinates.lat])
       .setPopup(popup)
       .addTo(map.current);
 
     // Add click handler
     el.addEventListener('click', () => {
       if (onDayClick) {
-        onDayClick(day.day);
+        onDayClick(route.day);
       }
     });
 
@@ -402,12 +470,12 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
 
   // Fly to selected day when it changes
   useEffect(() => {
-    if (!map.current || !mapLoaded || !selectedDay) return;
+    if (!map.current || !mapLoaded || !selectedDay || allRoutes.length === 0) return;
 
-    const day = itineraryData.find(d => d.day === selectedDay);
-    if (day) {
+    const route = allRoutes.find(d => d.day === selectedDay);
+    if (route && route.endCoordinates) {
       map.current.flyTo({
-        center: [day.coordinates.end[1], day.coordinates.end[0]],
+        center: [route.endCoordinates.lng, route.endCoordinates.lat],
         zoom: 8,
         duration: 1500
       });
@@ -418,7 +486,7 @@ export default function RouteMap({ onDayClick, selectedDay }: RouteMapProps) {
         marker.togglePopup();
       }
     }
-  }, [selectedDay, mapLoaded]);
+  }, [selectedDay, mapLoaded, allRoutes]);
 
   // Show placeholder if no token
   if (!hasToken) {

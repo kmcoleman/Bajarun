@@ -32,7 +32,7 @@ import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import type { NightConfig, NightSelection, UserSelections, AccommodationType } from '../types/eventConfig';
 import { emptyNightSelection, TRIP_NIGHTS } from '../types/eventConfig';
-import { itineraryData } from '../data/itinerary';
+import { useRoutes } from '../hooks/useRoutes';
 
 interface RiderInfo {
   id: string;
@@ -42,6 +42,7 @@ interface RiderInfo {
 
 export default function AdminRiderPreferencesPage() {
   const { user, loading: authLoading } = useAuth();
+  const { routes } = useRoutes();
 
   // Rider selection
   const [allRiders, setAllRiders] = useState<RiderInfo[]>([]);
@@ -88,7 +89,7 @@ export default function AdminRiderPreferencesPage() {
           const data = docSnap.data();
           if (data.fullName) {
             riders.push({
-              id: docSnap.id,
+              id: data.uid || docSnap.id,  // Use uid field, fallback to docId
               fullName: data.fullName,
               email: data.email
             });
@@ -161,9 +162,9 @@ export default function AdminRiderPreferencesPage() {
     loadRiderPreferences(riderId);
   };
 
-  // Get the itinerary day info for a night
-  const getItineraryForNight = (nightIndex: number) => {
-    return itineraryData[nightIndex] || null;
+  // Get the route info for a night (night index 0 = day 1)
+  const getRouteForNight = (nightIndex: number) => {
+    return routes.find(r => r.day === nightIndex + 1) || null;
   };
 
   // Toggle night expansion
@@ -425,7 +426,7 @@ export default function AdminRiderPreferencesPage() {
                 const config = nightConfigs[night.key];
                 const selection = userSelections[night.key] || emptyNightSelection;
                 const isExpanded = expandedNights.has(night.key);
-                const itineraryDay = getItineraryForNight(index);
+                const routeDay = getRouteForNight(index);
                 const hasOptions = config && (config.hotelAvailable || config.campingAvailable);
 
                 return (
@@ -447,7 +448,7 @@ export default function AdminRiderPreferencesPage() {
                             {night.label}
                           </h3>
                           <div className="text-sm text-slate-400">
-                            {itineraryDay ? itineraryDay.endPoint : 'Location TBD'}
+                            {routeDay?.endName || 'Location TBD'}
                           </div>
                         </div>
                       </div>

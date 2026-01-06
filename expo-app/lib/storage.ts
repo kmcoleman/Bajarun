@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const STORAGE_KEYS = {
   ROSTER: 'roster',
   EVENT_CONFIG: 'eventConfig',
+  ROUTES: 'routes',
   USER_SELECTIONS: 'userSelections',
   USER_PROFILE: 'userProfile',
   ANNOUNCEMENTS: 'announcements',

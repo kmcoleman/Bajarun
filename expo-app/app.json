@@ -32,7 +32,19 @@
         "backgroundColor": "#1e3a5f"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "bajarun2026"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -48,7 +60,13 @@
           "color": "#1e3a5f"
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.73531449020-55bab060gne2c4iqf3u5m77rvde2h6qh"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

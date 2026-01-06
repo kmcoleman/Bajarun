@@ -1,6 +1,7 @@
 /**
  * Authentication hook for Firebase Auth with Expo.
- * Uses expo-auth-session for Google Sign-In.
+ * Uses @react-native-google-signin for Android Google Sign-In.
+ * Uses expo-auth-session for iOS Google Sign-In.
  * Uses expo-apple-authentication for Apple Sign-In.
  */
 
@@ -36,6 +37,12 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
+import {
+  GoogleSignin,
+  isSuccessResponse,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { auth, db } from '../lib/firebase';
 import { clearAllData, updateSyncMeta } from '../lib/storage';
 import { registerForPushNotifications } from '../lib/notifications';
@@ -74,10 +81,16 @@ interface AuthState {
 
 // Google OAuth client IDs from Google Cloud Console
 const GOOGLE_IOS_CLIENT_ID = '73531449020-55bab060gne2c4iqf3u5m77rvde2h6qh.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID = ''; // Add Android client ID when ready
+const GOOGLE_ANDROID_CLIENT_ID = '73531449020-5podvbh2lhck5mpk60if6urql74fummt.apps.googleusercontent.com';
 const GOOGLE_WEB_CLIENT_ID = '73531449020-0kmmgg6jg0pmun1ip5rcqul1d9s90h6e.apps.googleusercontent.com';
-// For Expo Go, we use the proxy which requires a web client ID
-const EXPO_CLIENT_ID = '73531449020-0kmmgg6jg0pmun1ip5rcqul1d9s90h6e.apps.googleusercontent.com';
+
+// Configure native Google Sign-In for Android
+if (Platform.OS === 'android') {
+  GoogleSignin.configure({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    offlineAccess: true,
+  });
+}
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
@@ -148,13 +161,14 @@ export function useAuth() {
     }
   }, [state.loading, state.user, state.termsConfig, state.userTermsData]);
 
-  // Configure Google auth request
+  // Configure Google auth request for iOS only (Android uses native GoogleSignin)
+  // We still need to call the hook on Android to satisfy React's rules of hooks,
+  // but we provide the androidClientId to prevent validation errors
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    expoClientId: EXPO_CLIENT_ID,
-    selectAccount: true, // Always show account picker
+    selectAccount: true,
   });
 
   // Listen to Firebase auth state changes
@@ -238,9 +252,9 @@ export function useAuth() {
     };
   }, []);
 
-  // Handle Google auth response
+  // Handle Google auth response (iOS only - Android handles in signIn function)
   useEffect(() => {
-    if (response?.type === 'success') {
+    if (Platform.OS === 'ios' && response?.type === 'success') {
       const { id_token } = response.params;
       const credential = GoogleAuthProvider.credential(id_token);
       signInWithCredential(auth, credential).catch((error) => {
@@ -257,9 +271,48 @@ export function useAuth() {
   const signIn = async () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
-      await promptAsync();
-    } catch (error) {
+
+      if (Platform.OS === 'android') {
+        // Use native Google Sign-In for Android
+        await GoogleSignin.hasPlayServices();
+        const response = await GoogleSignin.signIn();
+
+        if (isSuccessResponse(response)) {
+          const idToken = response.data.idToken;
+          if (idToken) {
+            const credential = GoogleAuthProvider.credential(idToken);
+            await signInWithCredential(auth, credential);
+          } else {
+            throw new Error('No ID token received');
+          }
+        }
+      } else {
+        // Use expo-auth-session for iOS
+        await promptAsync();
+      }
+    } catch (error: any) {
       console.error('Sign in error:', error);
+
+      // Handle specific Google Sign-In errors
+      if (isErrorWithCode(error)) {
+        if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+          // User cancelled - don't show error
+          setState(prev => ({ ...prev, loading: false }));
+          return;
+        } else if (error.code === statusCodes.IN_PROGRESS) {
+          // Sign in already in progress
+          setState(prev => ({ ...prev, loading: false }));
+          return;
+        } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Google Play Services is not available. Please update or enable it.',
+          }));
+          return;
+        }
+      }
+
       setState(prev => ({
         ...prev,
         loading: false,
@@ -335,6 +388,14 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
+      // Sign out from native Google Sign-In on Android
+      if (Platform.OS === 'android') {
+        try {
+          await GoogleSignin.signOut();
+        } catch (e) {
+          // Ignore errors - user might not have signed in with Google
+        }
+      }
       await firebaseSignOut(auth);
       await clearAllData();
     } catch (error) {
@@ -419,7 +480,7 @@ export function useAuth() {
     signUpWithEmail,
     clearError,
     isAuthenticated: !!state.user,
-    isGoogleReady: !!request,
+    isGoogleReady: Platform.OS === 'android' ? true : !!request,
     isAppleAvailable: state.isAppleAvailable,
     // Registration state
     registration: state.registration,

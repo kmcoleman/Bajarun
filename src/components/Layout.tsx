@@ -51,6 +51,7 @@ const ADMIN_UID = 'kGEO7bTgqMMsDfXmkumneI44S9H2';
 const publicNavItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/tours', label: 'Events', icon: Calendar },
+  { path: '/about', label: 'About', icon: Users },
   { path: '/itinerary', label: 'Itinerary', icon: Map },
   { path: '/faq', label: 'FAQ', icon: HelpCircle },
   { path: '/guide', label: 'Support', icon: LifeBuoy },
@@ -80,7 +81,7 @@ interface Announcement {
 }
 
 // Pages that don't require terms acceptance
-const PUBLIC_PAGES = ['/', '/login', '/agree', '/privacy', '/terms', '/support', '/faq', '/guide', '/itinerary', '/waitlist', '/tours', '/cache-help'];
+const PUBLIC_PAGES = ['/', '/login', '/agree', '/privacy', '/terms', '/support', '/faq', '/guide', '/itinerary', '/waitlist', '/tours', '/cache-help', '/about', '/landing'];
 
 export default function Layout({ children }: LayoutProps) {
   const { user, logout, loading, hasRegistration, termsAccepted, termsLoading } = useAuth();
@@ -618,58 +619,14 @@ export default function Layout({ children }: LayoutProps) {
                               {/* Admin Section - Only for admin */}
                               {user?.uid === ADMIN_UID && (
                                 <div className="px-4 pb-3 border-b border-slate-700">
-                                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 px-1">Admin</p>
-                                  <div className="space-y-1">
-                                    <Link
-                                      to="/admin"
-                                      onClick={() => setProfileOpen(false)}
-                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
-                                    >
-                                      <Settings className="h-4 w-4" />
-                                      Dashboard
-                                    </Link>
-                                    <Link
-                                      to="/admin/nightly-config"
-                                      onClick={() => setProfileOpen(false)}
-                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
-                                    >
-                                      <Calendar className="h-4 w-4" />
-                                      Daily Config
-                                    </Link>
-                                    <Link
-                                      to="/admin/email-templates"
-                                      onClick={() => setProfileOpen(false)}
-                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
-                                    >
-                                      <Mail className="h-4 w-4" />
-                                      Email Templates
-                                    </Link>
-                                    {/* NEW EMAIL SYSTEM (isolated - delete this block to remove) */}
-                                    <Link
-                                      to="/admin/email-system"
-                                      onClick={() => setProfileOpen(false)}
-                                      className="flex items-center gap-2 w-full px-3 py-2 text-amber-400 hover:bg-slate-700 hover:text-amber-300 rounded-lg transition-colors"
-                                    >
-                                      <Mail className="h-4 w-4" />
-                                      Email System (New)
-                                    </Link>
-                                    <Link
-                                      to="/admin/room-assignments"
-                                      onClick={() => setProfileOpen(false)}
-                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
-                                    >
-                                      <BedDouble className="h-4 w-4" />
-                                      Room Assignments
-                                    </Link>
-                                    <Link
-                                      to="/admin/registrations"
-                                      onClick={() => setProfileOpen(false)}
-                                      className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
-                                    >
-                                      <User className="h-4 w-4" />
-                                      Enter Registrations
-                                    </Link>
-                                  </div>
+                                  <Link
+                                    to="/admin"
+                                    onClick={() => setProfileOpen(false)}
+                                    className="flex items-center gap-2 w-full px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors"
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                    Admin Dashboard
+                                  </Link>
                                 </div>
                               )}
 
@@ -824,55 +781,13 @@ export default function Layout({ children }: LayoutProps) {
                     {/* Admin Section - Only for admin */}
                     {user.uid === ADMIN_UID && (
                       <div className="pt-2 pb-1">
-                        <p className="text-xs text-slate-500 uppercase tracking-wider px-4 mb-1">Admin</p>
                         <Link
                           to="/admin"
                           onClick={() => setMobileMenuOpen(false)}
                           className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
                         >
                           <Settings className="h-5 w-5" />
-                          <span>Dashboard</span>
-                        </Link>
-                        <Link
-                          to="/admin/nightly-config"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          <Calendar className="h-5 w-5" />
-                          <span>Daily Config</span>
-                        </Link>
-                        <Link
-                          to="/admin/email-templates"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          <Mail className="h-5 w-5" />
-                          <span>Email Templates</span>
-                        </Link>
-                        {/* NEW EMAIL SYSTEM (isolated - delete this block to remove) */}
-                        <Link
-                          to="/admin/email-system"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-3 w-full px-4 py-2 text-amber-400 hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          <Mail className="h-5 w-5" />
-                          <span>Email System (New)</span>
-                        </Link>
-                        <Link
-                          to="/admin/room-assignments"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          <BedDouble className="h-5 w-5" />
-                          <span>Room Assignments</span>
-                        </Link>
-                        <Link
-                          to="/admin/registrations"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          <User className="h-5 w-5" />
-                          <span>Enter Registrations</span>
+                          <span>Admin Dashboard</span>
                         </Link>
                       </div>
                     )}

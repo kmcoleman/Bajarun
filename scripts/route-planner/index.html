@@ -16,14 +16,41 @@
       <!-- Route Section -->
       <section class="section">
         <h2>Route</h2>
+
+        <!-- Toggle between modes -->
         <div class="form-group">
-          <label>Start Location</label>
-          <input type="text" id="startInput" placeholder="e.g., Mulegé, Mexico">
+          <div class="toggle-row">
+            <button id="modeTextBtn" class="btn btn-small btn-active">Text</button>
+            <button id="modeUrlBtn" class="btn btn-small">Paste URLs</button>
+          </div>
         </div>
-        <div class="form-group">
-          <label>End Location</label>
-          <input type="text" id="endInput" placeholder="e.g., Bahía de los Ángeles, Mexico">
+
+        <!-- Text mode (requires API) -->
+        <div id="textMode">
+          <div class="form-group">
+            <label>Start Location</label>
+            <input type="text" id="startInput" placeholder="e.g., Mulegé, Mexico">
+          </div>
+          <div class="form-group">
+            <label>End Location</label>
+            <input type="text" id="endInput" placeholder="e.g., Bahía de los Ángeles, Mexico">
+          </div>
         </div>
+
+        <!-- URL mode (no API needed) -->
+        <div id="urlMode" style="display: none;">
+          <div class="form-group">
+            <label>Start Location (Google Maps URL)</label>
+            <input type="text" id="startUrlInput" placeholder="Paste Google Maps URL for start">
+            <input type="text" id="startNameInput" placeholder="Location name (optional)" style="margin-top: 4px;">
+          </div>
+          <div class="form-group">
+            <label>End Location (Google Maps URL)</label>
+            <input type="text" id="endUrlInput" placeholder="Paste Google Maps URL for end">
+            <input type="text" id="endNameInput" placeholder="Location name (optional)" style="margin-top: 4px;">
+          </div>
+        </div>
+
         <button id="setRouteBtn" class="btn btn-primary">Set Route</button>
         <div id="routeInfo" class="route-info" style="display: none;">
           <span id="routeDistance"></span> &bull; <span id="routeDuration"></span>

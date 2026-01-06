@@ -34,3 +34,8 @@ functions/rider-demographics.pdf
 
 # Firebase emulator data (local development)
 emulator-data/
+
+# Environment files
+.env
+.env.*
+\!.env.example

@@ -30,7 +30,8 @@ import {
   Send,
   X,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Map
 } from 'lucide-react';
 
 const ADMIN_UID = 'kGEO7bTgqMMsDfXmkumneI44S9H2';
@@ -86,6 +87,7 @@ export default function AdminLayout({ children, title, waitlistCount = 0 }: Admi
         { id: '/admin?tab=accommodations', label: 'Rider Preferences', icon: UserCog },
         { id: '/admin/rider-preferences', label: 'Edit Preferences', icon: Settings },
         { id: '/admin/nightly-config', label: 'Nightly Config', icon: Calendar },
+        { id: '/admin/routes', label: 'Routes & Itinerary', icon: Map },
       ]
     },
     {

@@ -9,6 +9,7 @@ import {
   syncAllData,
   getCachedRoster,
   getCachedEventConfig,
+  getCachedRoutes,
   getCachedUserSelections,
   getCachedUserProfile,
   getCachedAnnouncements,
@@ -18,11 +19,13 @@ import {
   Announcement,
   EventConfig,
   RiderDocuments,
+  RouteConfig,
 } from '../lib/sync';
 
 interface OfflineDataState {
   roster: Participant[];
   eventConfig: EventConfig | null;
+  routes: RouteConfig[];
   userSelections: UserSelections | null;
   userProfile: Participant | null;
   announcements: Announcement[];
@@ -38,6 +41,7 @@ export function useOfflineData(userId: string | null) {
   const [state, setState] = useState<OfflineDataState>({
     roster: [],
     eventConfig: null,
+    routes: [],
     userSelections: null,
     userProfile: null,
     announcements: [],
@@ -51,10 +55,11 @@ export function useOfflineData(userId: string | null) {
   // Load cached data from AsyncStorage
   const loadCachedData = useCallback(async () => {
     try {
-      const [roster, eventConfig, userSelections, userProfile, announcements, riderDocuments] =
+      const [roster, eventConfig, routes, userSelections, userProfile, announcements, riderDocuments] =
         await Promise.all([
           getCachedRoster(),
           getCachedEventConfig(),
+          getCachedRoutes(),
           getCachedUserSelections(),
           getCachedUserProfile(),
           getCachedAnnouncements(),
@@ -65,6 +70,7 @@ export function useOfflineData(userId: string | null) {
         ...prev,
         roster,
         eventConfig,
+        routes,
         userSelections,
         userProfile,
         announcements,

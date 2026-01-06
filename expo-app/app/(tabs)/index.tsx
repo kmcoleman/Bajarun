@@ -1,6 +1,8 @@
 /**
  * Tour page - The main view showing all info for a selected day.
  * Redesigned to match Stitch mockups with dark theme.
+ *
+ * Data source: Firestore events/bajarun2026/routes/day{N}
  */
 
 import { useState } from 'react';
@@ -12,12 +14,12 @@ import {
   Linking,
   RefreshControl,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineData } from '../../hooks/useOfflineData';
-import { itineraryData as defaultItineraryData } from '../../data/itinerary';
 import { useTheme } from '../../context/ThemeContext';
 import { spacing, borderRadius } from '../../constants/theme';
 import AlertsDropdown from '../../components/AlertsDropdown';
@@ -26,48 +28,62 @@ import RouteMapView from '../../components/RouteMapView';
 export default function TourPage() {
   const { user } = useAuth();
   const { theme, isDark } = useTheme();
-  const { userSelections, eventConfig, loading, syncing, refresh } = useOfflineData(
+  const { userSelections, eventConfig, routes, loading, syncing, refresh } = useOfflineData(
     user?.uid || null
   );
   const [selectedDay, setSelectedDay] = useState(1);
 
-  // Use hardcoded itinerary as base, merge with Firestore eventConfig
-  const itineraryData = defaultItineraryData;
-
-  const dayData = itineraryData.find((d) => d.day === selectedDay);
+  // Get route data directly from Firestore (single source of truth)
+  const routeData = routes.find((r) => r.day === selectedDay);
   const nightKey = `night-${selectedDay}`;
   const userNightSelection = userSelections?.nights?.[nightKey];
   const nightConfig = eventConfig?.[nightKey];
 
-  // Merge Firestore data with hardcoded itinerary
-  const mergedDayData = dayData ? {
-    ...dayData,
-    // Override with Firestore data if available
-    startPoint: nightConfig?.routeConfig?.startName || dayData.startPoint,
-    endPoint: nightConfig?.routeConfig?.endName || dayData.endPoint,
-    miles: nightConfig?.routeConfig?.estimatedDistance || dayData.miles,
-    ridingTime: nightConfig?.routeConfig?.estimatedTime
-      ? `${nightConfig.routeConfig.estimatedTime} hours`
-      : dayData.ridingTime,
-    accommodation: nightConfig?.hotelName || nightConfig?.campingName || dayData.accommodation,
-    // Use Firestore coordinates if available
-    coordinates: nightConfig?.routeConfig?.startCoordinates && nightConfig?.routeConfig?.endCoordinates
-      ? {
-          start: [nightConfig.routeConfig.startCoordinates.lat, nightConfig.routeConfig.startCoordinates.lng] as [number, number],
-          end: [nightConfig.routeConfig.endCoordinates.lat, nightConfig.routeConfig.endCoordinates.lng] as [number, number],
-        }
-      : dayData.coordinates,
+  // Build display data from route (with accommodation from eventConfig)
+  const dayData = routeData ? {
+    day: routeData.day,
+    date: routeData.date,
+    title: routeData.title,
+    description: routeData.description,
+    startPoint: routeData.startName,
+    endPoint: routeData.endName,
+    miles: routeData.estimatedDistance || 0,
+    ridingTime: routeData.estimatedTime || 'N/A',
+    accommodation: nightConfig?.hotelName || nightConfig?.campingName || routeData.accommodation || 'TBD',
+    accommodationType: routeData.accommodationType || 'hotel',
+    pois: routeData.pois || [],
+    coordinates: {
+      start: [routeData.startCoordinates?.lat || 0, routeData.startCoordinates?.lng || 0] as [number, number],
+      end: [routeData.endCoordinates?.lat || 0, routeData.endCoordinates?.lng || 0] as [number, number],
+    },
+    waypoints: routeData.waypoints?.map(wp => [wp.lat, wp.lng] as [number, number]),
   } : null;
 
   const openMaps = (url: string) => {
     Linking.openURL(url);
   };
 
-  if (!mergedDayData) {
+  // Show loading state while routes are loading
+  if (loading && routes.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Text style={{ color: theme.textMuted }}>Day not found</Text>
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.accent} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading itinerary...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!dayData) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <Text style={{ color: theme.textMuted }}>
+            {routes.length === 0 ? 'No routes available. Pull to refresh.' : 'Day not found'}
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -88,12 +104,12 @@ export default function TourPage() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.daySelectorContent}
         >
-          {itineraryData.map((day) => {
-            const isSelected = selectedDay === day.day;
+          {routes.map((route) => {
+            const isSelected = selectedDay === route.day;
             return (
               <TouchableOpacity
-                key={day.day}
-                onPress={() => setSelectedDay(day.day)}
+                key={route.day}
+                onPress={() => setSelectedDay(route.day)}
                 style={[
                   styles.dayTab,
                   isSelected && { backgroundColor: theme.accent },
@@ -106,7 +122,7 @@ export default function TourPage() {
                     { color: isSelected ? '#ffffff' : theme.textSecondary },
                   ]}
                 >
-                  Day {day.day}
+                  Day {route.day}
                 </Text>
               </TouchableOpacity>
             );
@@ -129,12 +145,12 @@ export default function TourPage() {
         {/* Day Title */}
         <View style={styles.titleSection}>
           <Text style={[styles.dayTitle, { color: theme.textPrimary }]}>
-            {mergedDayData.title}
+            {dayData.title}
           </Text>
           <View style={styles.dateRow}>
             <FontAwesome name="calendar" size={14} color={theme.accent} />
             <Text style={[styles.dateText, { color: theme.textSecondary }]}>
-              {mergedDayData.date}
+              {dayData.date}
             </Text>
           </View>
         </View>
@@ -145,7 +161,7 @@ export default function TourPage() {
             Overview
           </Text>
           <Text style={[styles.overviewText, { color: theme.textSecondary }]}>
-            {mergedDayData.description}
+            {dayData.description}
           </Text>
         </View>
 
@@ -161,7 +177,7 @@ export default function TourPage() {
                 START POINT
               </Text>
               <Text style={[styles.routeValue, { color: theme.textPrimary }]}>
-                {mergedDayData.startPoint}
+                {dayData.startPoint}
               </Text>
             </View>
             <View style={styles.routeItem}>
@@ -169,7 +185,7 @@ export default function TourPage() {
                 END POINT
               </Text>
               <Text style={[styles.routeValue, { color: theme.textPrimary }]}>
-                {mergedDayData.endPoint}
+                {dayData.endPoint}
               </Text>
             </View>
             <View style={styles.routeItem}>
@@ -177,7 +193,7 @@ export default function TourPage() {
                 DISTANCE
               </Text>
               <Text style={[styles.routeValue, { color: theme.textPrimary }]}>
-                {mergedDayData.miles > 0 ? `${mergedDayData.miles} miles` : 'N/A'}
+                {dayData.miles > 0 ? `${dayData.miles} miles` : 'N/A'}
               </Text>
             </View>
             <View style={styles.routeItem}>
@@ -185,15 +201,15 @@ export default function TourPage() {
                 EST. TIME
               </Text>
               <Text style={[styles.routeValue, { color: theme.textPrimary }]}>
-                {mergedDayData.ridingTime}
+                {dayData.ridingTime}
               </Text>
             </View>
           </View>
 
-          {mergedDayData.miles > 0 && (
+          {dayData.miles > 0 && (
             <TouchableOpacity
               onPress={() => openMaps(
-                `https://www.google.com/maps/dir/${mergedDayData.coordinates.start[0]},${mergedDayData.coordinates.start[1]}/${mergedDayData.coordinates.end[0]},${mergedDayData.coordinates.end[1]}`
+                `https://www.google.com/maps/dir/${dayData.coordinates.start[0]},${dayData.coordinates.start[1]}/${dayData.coordinates.end[0]},${dayData.coordinates.end[1]}`
               )}
               style={[styles.mapsButton, { backgroundColor: theme.accent }]}
             >
@@ -204,29 +220,29 @@ export default function TourPage() {
 
           {/* Route Map */}
           <RouteMapView
-            startCoordinates={mergedDayData.coordinates.start}
-            endCoordinates={mergedDayData.coordinates.end}
-            startName={mergedDayData.startPoint}
-            endName={mergedDayData.endPoint}
+            startCoordinates={dayData.coordinates.start}
+            endCoordinates={dayData.coordinates.end}
+            startName={dayData.startPoint}
+            endName={dayData.endPoint}
             dayNumber={selectedDay}
-            waypoints={dayData?.waypoints}
+            waypoints={dayData.waypoints}
           />
         </View>
 
-        {/* Key Highlights */}
-        {mergedDayData.pointsOfInterest.length > 0 && (
+        {/* Key Highlights - show POI names */}
+        {dayData.pois && dayData.pois.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
               Key Highlights
             </Text>
             <View style={styles.highlightsRow}>
-              {mergedDayData.pointsOfInterest.slice(0, 4).map((poi, idx) => (
+              {dayData.pois.slice(0, 4).map((poi, idx) => (
                 <View
-                  key={idx}
+                  key={poi.id || idx}
                   style={[styles.highlightChip, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}
                 >
                   <Text style={[styles.highlightText, { color: theme.textSecondary }]}>
-                    {poi}
+                    {poi.name}
                   </Text>
                 </View>
               ))}
@@ -244,7 +260,7 @@ export default function TourPage() {
           </View>
 
           <Text style={[styles.accommodationName, { color: theme.textPrimary }]}>
-            {mergedDayData.accommodation}
+            {dayData.accommodation}
           </Text>
 
           {nightConfig?.hotelAddress && (
@@ -331,6 +347,16 @@ export default function TourPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',

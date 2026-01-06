@@ -22,6 +22,7 @@ import {
   DollarSign,
   Check,
   UserRound,
+  Users,
   Compass,
   Plus,
   Trash2,
@@ -82,7 +83,7 @@ export default function NightlyConfigPage() {
   }, [user, isAdmin, authLoading]);
 
   // Update a field in the current night's config
-  const updateField = (field: keyof NightConfig, value: string | number | boolean | OptionalActivity[] | RouteConfig) => {
+  const updateField = (field: keyof NightConfig, value: string | number | boolean | string[] | OptionalActivity[] | RouteConfig) => {
     setNightConfigs(prev => ({
       ...prev,
       [selectedNight.key]: {
@@ -284,6 +285,79 @@ export default function NightlyConfigPage() {
           <p className="text-slate-400">Date: {selectedNight.date}</p>
         </div>
 
+        {/* Day Information Section */}
+        <section className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-6">
+          <div className="p-4 border-b border-slate-700 flex items-center gap-3">
+            <div className="w-10 h-10 bg-sky-600/20 rounded-lg flex items-center justify-center">
+              <Flag className="h-5 w-5 text-sky-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Day Information</h3>
+              <p className="text-xs text-slate-400">Highlights shown in mobile app (ride info is in Routes admin)</p>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Highlights */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-slate-300">
+                  Key Highlights / Points of Interest
+                </label>
+                <button
+                  onClick={() => {
+                    const pois = [...(currentConfig.highlights || []), ''];
+                    updateField('highlights', pois);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add
+                </button>
+              </div>
+
+              {(!currentConfig.highlights || currentConfig.highlights.length === 0) ? (
+                <p className="text-sm text-slate-400 text-center py-4 bg-slate-900 rounded-lg border border-slate-700">
+                  No highlights added. Click "Add" to create one.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {currentConfig.highlights.map((poi, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <span className="w-6 h-6 bg-sky-600/30 rounded-full flex items-center justify-center text-sky-400 text-xs font-medium flex-shrink-0">
+                        {index + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={poi}
+                        onChange={(e) => {
+                          const pois = [...(currentConfig.highlights || [])];
+                          pois[index] = e.target.value;
+                          updateField('highlights', pois);
+                        }}
+                        placeholder="e.g., Valle de Guadalupe wine country"
+                        className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 text-sm"
+                      />
+                      <button
+                        onClick={() => {
+                          const pois = (currentConfig.highlights || []).filter((_, i) => i !== index);
+                          updateField('highlights', pois);
+                        }}
+                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors flex-shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-slate-500 mt-2">
+                These appear as highlight chips in the mobile app's Tour view.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Night Summary */}
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 mb-6">
           <label className="block text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">
@@ -329,7 +403,7 @@ export default function NightlyConfigPage() {
 
             {currentConfig.hotelAvailable && (
               <div className="p-4 space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">
                       Hotel Name *
@@ -354,6 +428,20 @@ export default function NightlyConfigPage() {
                       placeholder="50"
                       className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      <Users className="inline h-4 w-4 mr-1" />
+                      Max Capacity
+                    </label>
+                    <input
+                      type="number"
+                      value={currentConfig.hotelCapacity || ''}
+                      onChange={(e) => updateField('hotelCapacity', parseInt(e.target.value) || 0)}
+                      placeholder="0 = unlimited"
+                      className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">0 = unlimited</p>
                   </div>
                 </div>
 

@@ -124,11 +124,8 @@ service cloud.firestore {
       // Users can create their own document
       allow create: if request.auth != null && request.auth.uid == userId;
 
-      // Users can update their own document, BUT cannot change accommodationSelections once set
-      allow update: if request.auth != null && request.auth.uid == userId &&
-        // Allow if: no existing accommodationSelections OR not changing it
-        (!('accommodationSelections' in resource.data) ||
-         request.resource.data.accommodationSelections == resource.data.accommodationSelections);
+      // Users can update their own document
+      allow update: if request.auth != null && request.auth.uid == userId;
 
       // Users cannot delete their document
       allow delete: if false;

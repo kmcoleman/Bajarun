@@ -9,7 +9,21 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
+import LandingPage from './pages/LandingPage';
 import ItineraryPage from './pages/ItineraryPage';
+
+// Determine which homepage to show based on hostname
+function RootPage() {
+  const hostname = window.location.hostname;
+
+  // Show Baja-specific homepage for bajarun subdomain
+  if (hostname.includes('bajarun')) {
+    return <HomePage />;
+  }
+
+  // Show company landing page for ncmotoadv.com or localhost
+  return <LandingPage />;
+}
 import DiscussionPage from './pages/DiscussionPage';
 import ParticipantsPage from './pages/ParticipantsPage';
 import FAQPage from './pages/FAQPage';
@@ -39,6 +53,9 @@ import TourUpdateEmailPage from './pages/TourUpdateEmailPage';
 import RegistrationCleanupPage from './pages/RegistrationCleanupPage';
 import DataIntegrityPage from './pages/DataIntegrityPage';
 import HeadshotsPage from './pages/HeadshotsPage';
+import AdminRoutesPage from './pages/AdminRoutesPage';
+import AboutPage from './pages/AboutPage';
+import PostChargePage from './pages/PostChargePage';
 // NEW EMAIL SYSTEM (isolated - delete this line to remove)
 import EmailSystemPage from './pages/EmailSystemPage';
 
@@ -48,7 +65,10 @@ function App() {
       <BrowserRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<RootPage />} />
+            <Route path="/baja" element={<HomePage />} />
+            <Route path="/landing" element={<LandingPage />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/tours" element={<ToursPage />} />
             <Route path="/itinerary" element={<ItineraryPage />} />
             <Route path="/discussion" element={<DiscussionPage />} />
@@ -68,6 +88,8 @@ function App() {
             <Route path="/admin/registration-cleanup" element={<RegistrationCleanupPage />} />
             <Route path="/admin/data-integrity" element={<DataIntegrityPage />} />
             <Route path="/admin/headshots" element={<HeadshotsPage />} />
+            <Route path="/admin/routes" element={<AdminRoutesPage />} />
+            <Route path="/admin/post-charge" element={<PostChargePage />} />
             {/* NEW EMAIL SYSTEM (isolated - delete this line to remove) */}
             <Route path="/admin/email-system" element={<EmailSystemPage />} />
             <Route path="/my-selections" element={<AccommodationSelectPage />} />

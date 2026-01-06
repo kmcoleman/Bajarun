@@ -146,28 +146,54 @@ function RouteMapViewInner({
     };
   };
 
-  // Load POIs from Firestore for this day
+  // State for stored geometry
+  const [storedGeometry, setStoredGeometry] = useState<{ latitude: number; longitude: number }[] | null>(null);
+
+  // Load POIs and route geometry from Firestore for this day
   useEffect(() => {
-    async function loadPOIs() {
+    async function loadRouteData() {
       try {
         const routeDoc = await getDoc(doc(db, 'events', 'bajarun2026', 'routes', `day${dayNumber}`));
         if (routeDoc.exists()) {
           const data = routeDoc.data();
+          // Load POIs
           if (data.pois && Array.isArray(data.pois)) {
             setPois(data.pois.filter((poi: POI) => poi.coordinates?.lat && poi.coordinates?.lng));
           }
+          // Load stored route geometry if available
+          if (data.routeGeometry?.coordinates && Array.isArray(data.routeGeometry.coordinates)) {
+            // Convert GeoJSON [lng, lat] to { latitude, longitude }
+            // Filter out any invalid coordinates
+            const geometry = data.routeGeometry.coordinates
+              .filter((coord: any) =>
+                Array.isArray(coord) &&
+                coord.length >= 2 &&
+                typeof coord[0] === 'number' &&
+                typeof coord[1] === 'number' &&
+                !isNaN(coord[0]) &&
+                !isNaN(coord[1])
+              )
+              .map((coord: [number, number]) => ({
+                latitude: coord[1],
+                longitude: coord[0],
+              }));
+            if (geometry.length > 0) {
+              setStoredGeometry(geometry);
+              console.log('Using stored route geometry:', geometry.length, 'points');
+            }
+          }
         }
       } catch (error) {
-        console.log('Error loading POIs:', error);
+        console.log('Error loading route data:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    loadPOIs();
+    loadRouteData();
   }, [dayNumber]);
 
-  // Fetch driving route when coordinates change
+  // Fetch driving route when coordinates change (or use stored geometry)
   useEffect(() => {
     async function loadRoute() {
       // Skip if same location (rest day)
@@ -179,6 +205,13 @@ function RouteMapViewInner({
         return;
       }
 
+      // Use stored geometry if available (instant, no API call)
+      if (storedGeometry && storedGeometry.length > 0) {
+        setRouteCoordinates(storedGeometry);
+        return;
+      }
+
+      // Fallback: fetch from Mapbox API
       setRouteLoading(true);
 
       // Build waypoints array: start -> waypoints -> end
@@ -205,7 +238,7 @@ function RouteMapViewInner({
     }
 
     loadRoute();
-  }, [startCoordinates, endCoordinates, waypoints]);
+  }, [startCoordinates, endCoordinates, waypoints, storedGeometry]);
 
   // Animate to region when day changes
   useEffect(() => {
@@ -235,8 +268,9 @@ function RouteMapViewInner({
         rotateEnabled={false}
         onMapReady={() => setLoading(false)}
       >
-        {/* Route polyline (only if we have coordinates) */}
-        {routeCoordinates.length > 1 && (
+        {/* Route polyline (only if we have valid coordinates) */}
+        {routeCoordinates.length > 1 &&
+          routeCoordinates.every(c => typeof c.latitude === 'number' && typeof c.longitude === 'number') && (
           <Polyline
             coordinates={routeCoordinates}
             strokeColor={theme.accent}

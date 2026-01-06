@@ -14,7 +14,6 @@ import { useTheme } from '../context/ThemeContext';
 import { spacing, borderRadius } from '../constants/theme';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { itineraryData } from '../data/itinerary';
 
 type AccommodationType = 'hotel' | 'camping' | 'own';
 
@@ -129,11 +128,6 @@ export default function RideSelectionsPage() {
 
     fetchData();
   }, [user?.uid]);
-
-  // Get itinerary day for a night (night index corresponds to day index)
-  const getItineraryForNight = (nightIndex: number) => {
-    return itineraryData[nightIndex] || null;
-  };
 
   // Count nights with selections
   const confirmedNights = Object.values(selections).filter(s => s.accommodation !== null).length;
@@ -287,7 +281,6 @@ export default function RideSelectionsPage() {
           const nightSelection = selections[night.key];
           const hasOptions = config && (config.hotelAvailable || config.campingAvailable);
           const hasSelection = nightSelection?.accommodation !== null && nightSelection?.accommodation !== undefined;
-          const itineraryDay = getItineraryForNight(index);
 
           return (
             <View
@@ -311,7 +304,7 @@ export default function RideSelectionsPage() {
                     {night.label}
                   </Text>
                   <Text style={[styles.dayLocation, { color: theme.textPrimary }]}>
-                    {itineraryDay?.endPoint || config?.hotelName || 'Location TBD'}
+                    {config?.hotelName || 'Location TBD'}
                   </Text>
                 </View>
 

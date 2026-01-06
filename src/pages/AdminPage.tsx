@@ -1164,6 +1164,7 @@ export default function AdminPage() {
       icon: DollarSign,
       items: [
         { id: 'ledger', label: 'Ledger', icon: Receipt, type: 'tab' as const },
+        { id: '/admin/post-charge', label: 'Post Charge', icon: CreditCard, type: 'link' as const },
       ]
     },
     {

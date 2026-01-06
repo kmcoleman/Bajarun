@@ -9,7 +9,8 @@ const state = {
   waypoints: [],      // [{ lat, lng }]
   pois: [],           // [{ id, name, coordinates, category, description, phone, hours }]
   routePolyline: null,// Encoded polyline from API
-  routeInfo: null     // { distanceMiles, duration }
+  routeInfo: null,    // { distanceMiles, duration }
+  mode: 'url'         // 'text' or 'url' - default to URL mode (no API needed)
 };
 
 // Map and layers
@@ -37,6 +38,99 @@ const CATEGORY_LABELS = {
   border: 'Border',
   emergency: 'SOS'
 };
+
+// Parse Google Maps URL locally (no API needed)
+function parseGoogleMapsUrlLocal(url) {
+  if (!url || typeof url !== 'string') {
+    console.error('Invalid URL input:', url);
+    return null;
+  }
+
+  try {
+    const decoded = decodeURIComponent(url);
+    let lat, lng, name;
+
+    console.log('Parsing URL:', decoded.substring(0, 100) + '...');
+
+    // Try @lat,lng format (most common)
+    const atMatch = decoded.match(/@(-?[\d.]+),(-?[\d.]+)/);
+    if (atMatch) {
+      lat = parseFloat(atMatch[1]);
+      lng = parseFloat(atMatch[2]);
+      console.log('Found @lat,lng:', lat, lng);
+    }
+
+    // Try !3d!4d format
+    if (!lat || !lng) {
+      const dataMatch = decoded.match(/!3d(-?[\d.]+)!4d(-?[\d.]+)/);
+      if (dataMatch) {
+        lat = parseFloat(dataMatch[1]);
+        lng = parseFloat(dataMatch[2]);
+        console.log('Found !3d!4d:', lat, lng);
+      }
+    }
+
+    // Try ?q=lat,lng format
+    if (!lat || !lng) {
+      const qMatch = decoded.match(/[?&]q=(-?[\d.]+),(-?[\d.]+)/);
+      if (qMatch) {
+        lat = parseFloat(qMatch[1]);
+        lng = parseFloat(qMatch[2]);
+        console.log('Found ?q=:', lat, lng);
+      }
+    }
+
+    // Try ll=lat,lng format (another common format)
+    if (!lat || !lng) {
+      const llMatch = decoded.match(/ll=(-?[\d.]+),(-?[\d.]+)/);
+      if (llMatch) {
+        lat = parseFloat(llMatch[1]);
+        lng = parseFloat(llMatch[2]);
+        console.log('Found ll=:', lat, lng);
+      }
+    }
+
+    // Extract place name from /place/ path
+    const placeMatch = decoded.match(/\/place\/([^/@]+)/);
+    if (placeMatch) {
+      name = placeMatch[1].replace(/\+/g, ' ').replace(/%20/g, ' ');
+      console.log('Found place name:', name);
+    }
+
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      const result = { lat, lng, name: name || `${lat.toFixed(4)}, ${lng.toFixed(4)}` };
+      console.log('Parse result:', result);
+      return result;
+    }
+
+    console.error('Could not extract coordinates from URL');
+    return null;
+  } catch (e) {
+    console.error('URL parse error:', e);
+    return null;
+  }
+}
+
+// Toggle between text and URL mode
+function setMode(mode) {
+  state.mode = mode;
+  const textMode = document.getElementById('textMode');
+  const urlMode = document.getElementById('urlMode');
+  const textBtn = document.getElementById('modeTextBtn');
+  const urlBtn = document.getElementById('modeUrlBtn');
+
+  if (mode === 'text') {
+    textMode.style.display = 'block';
+    urlMode.style.display = 'none';
+    textBtn.classList.add('btn-active');
+    urlBtn.classList.remove('btn-active');
+  } else {
+    textMode.style.display = 'none';
+    urlMode.style.display = 'block';
+    textBtn.classList.remove('btn-active');
+    urlBtn.classList.add('btn-active');
+  }
+}
 
 // Initialize map
 function initMap() {
@@ -217,32 +311,46 @@ function renderRoute() {
   }
 }
 
-// Update route from API
+// Update route using OSRM (free, no API key needed)
 async function updateRoute() {
   if (!state.start || !state.end) return;
 
   try {
-    const response = await fetch('/api/route', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        origin: { lat: state.start.lat, lng: state.start.lng },
-        destination: { lat: state.end.lat, lng: state.end.lng },
-        waypoints: state.waypoints
-      })
-    });
+    // Build coordinates string for OSRM: lng,lat;lng,lat;...
+    const coords = [
+      `${state.start.lng},${state.start.lat}`,
+      ...state.waypoints.map(wp => `${wp.lng},${wp.lat}`),
+      `${state.end.lng},${state.end.lat}`
+    ].join(';');
 
+    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=polyline`;
+    console.log('OSRM request:', url);
+
+    const response = await fetch(url);
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
 
-    state.routePolyline = data.polyline;
+    if (data.code !== 'Ok') {
+      throw new Error(data.message || 'OSRM routing failed');
+    }
+
+    const route = data.routes[0];
+    state.routePolyline = route.geometry;
+
+    // Convert meters to miles, seconds to readable duration
+    const distanceMiles = (route.distance / 1609.34).toFixed(1);
+    const hours = Math.floor(route.duration / 3600);
+    const minutes = Math.round((route.duration % 3600) / 60);
+    const duration = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
     state.routeInfo = {
-      distanceMiles: data.distanceMiles,
-      duration: data.duration
+      distanceMiles: parseFloat(distanceMiles),
+      duration: duration
     };
 
     renderRoute();
     showRouteInfo();
+    console.log('Route loaded:', distanceMiles, 'miles,', duration);
+
   } catch (err) {
     console.error('Route error:', err);
     // Fallback: draw straight line
@@ -255,7 +363,27 @@ async function updateRoute() {
     const line = L.polyline(points, { color: '#3b82f6', weight: 4, dashArray: '10, 10' });
     routeLayer.addLayer(line);
     map.fitBounds(line.getBounds(), { padding: [50, 50] });
+
+    // Show approximate straight-line distance
+    const straightDistance = calculateDistance(state.start.lat, state.start.lng, state.end.lat, state.end.lng);
+    state.routeInfo = {
+      distanceMiles: straightDistance,
+      duration: 'N/A (straight line)'
+    };
+    showRouteInfo();
   }
+}
+
+// Calculate straight-line distance in miles (Haversine formula)
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return Math.round(R * c);
 }
 
 // Show route info
@@ -349,48 +477,98 @@ function renderRouteItems() {
 
 // Set route from inputs
 async function setRoute() {
-  const startInput = document.getElementById('startInput').value.trim();
-  const endInput = document.getElementById('endInput').value.trim();
-
-  if (!startInput || !endInput) {
-    alert('Please enter both start and end locations');
-    return;
-  }
-
   const btn = document.getElementById('setRouteBtn');
   btn.disabled = true;
   btn.textContent = 'Loading...';
 
   try {
-    // Geocode start
-    const startResponse = await fetch('/api/geocode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: startInput })
-    });
-    const startData = await startResponse.json();
-    if (!startResponse.ok) throw new Error(startData.error);
+    console.log('setRoute called, mode:', state.mode);
 
-    state.start = {
-      lat: startData.lat,
-      lng: startData.lng,
-      name: startData.formattedAddress || startInput
-    };
+    if (state.mode === 'url') {
+      // URL mode - parse locally, no API needed
+      const startUrlEl = document.getElementById('startUrlInput');
+      const endUrlEl = document.getElementById('endUrlInput');
+      const startNameEl = document.getElementById('startNameInput');
+      const endNameEl = document.getElementById('endNameInput');
 
-    // Geocode end
-    const endResponse = await fetch('/api/geocode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: endInput })
-    });
-    const endData = await endResponse.json();
-    if (!endResponse.ok) throw new Error(endData.error);
+      console.log('URL elements found:', !!startUrlEl, !!endUrlEl);
 
-    state.end = {
-      lat: endData.lat,
-      lng: endData.lng,
-      name: endData.formattedAddress || endInput
-    };
+      const startUrl = startUrlEl ? startUrlEl.value.trim() : '';
+      const endUrl = endUrlEl ? endUrlEl.value.trim() : '';
+      const startName = startNameEl ? startNameEl.value.trim() : '';
+      const endName = endNameEl ? endNameEl.value.trim() : '';
+
+      console.log('Start URL:', startUrl.substring(0, 50) + '...');
+      console.log('End URL:', endUrl.substring(0, 50) + '...');
+
+      if (!startUrl || !endUrl) {
+        throw new Error('Please paste Google Maps URLs for both start and end locations');
+      }
+
+      const startParsed = parseGoogleMapsUrlLocal(startUrl);
+      const endParsed = parseGoogleMapsUrlLocal(endUrl);
+
+      console.log('Parsed start:', startParsed);
+      console.log('Parsed end:', endParsed);
+
+      if (!startParsed) {
+        throw new Error('Could not parse start URL. Make sure it contains coordinates (look for @ symbol in the URL)');
+      }
+      if (!endParsed) {
+        throw new Error('Could not parse end URL. Make sure it contains coordinates (look for @ symbol in the URL)');
+      }
+
+      state.start = {
+        lat: startParsed.lat,
+        lng: startParsed.lng,
+        name: startName || startParsed.name
+      };
+
+      state.end = {
+        lat: endParsed.lat,
+        lng: endParsed.lng,
+        name: endName || endParsed.name
+      };
+
+    } else {
+      // Text mode - requires API
+      const startInput = document.getElementById('startInput').value.trim();
+      const endInput = document.getElementById('endInput').value.trim();
+
+      if (!startInput || !endInput) {
+        throw new Error('Please enter both start and end locations');
+      }
+
+      // Geocode start
+      const startResponse = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: startInput })
+      });
+      const startData = await startResponse.json();
+      if (!startResponse.ok) throw new Error(startData.error);
+
+      state.start = {
+        lat: startData.lat,
+        lng: startData.lng,
+        name: startData.formattedAddress || startInput
+      };
+
+      // Geocode end
+      const endResponse = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: endInput })
+      });
+      const endData = await endResponse.json();
+      if (!endResponse.ok) throw new Error(endData.error);
+
+      state.end = {
+        lat: endData.lat,
+        lng: endData.lng,
+        name: endData.formattedAddress || endInput
+      };
+    }
 
     // Clear waypoints and POIs for new route
     state.waypoints = [];
@@ -510,7 +688,7 @@ function clearSearchResults() {
   document.getElementById('resultsList').innerHTML = '';
 }
 
-// Add waypoint from URL
+// Add waypoint from URL (local parsing, no server needed)
 async function addWaypointFromUrl() {
   const urlInput = document.getElementById('waypointUrlInput').value.trim();
 
@@ -524,32 +702,25 @@ async function addWaypointFromUrl() {
     return;
   }
 
-  try {
-    const response = await fetch('/api/parse-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: urlInput })
-    });
+  const parsed = parseGoogleMapsUrlLocal(urlInput);
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    // Add as waypoint
-    state.waypoints.push({ lat: data.lat, lng: data.lng, name: data.name });
-
-    document.getElementById('waypointUrlInput').value = '';
-
-    await updateRoute();
-    renderMarkers();
-    renderRouteItems();
-
-  } catch (err) {
-    alert('Could not parse URL: ' + err.message);
+  if (!parsed) {
+    alert('Could not parse URL. Make sure it contains coordinates (look for @ symbol in the URL)');
+    return;
   }
+
+  // Add as waypoint
+  state.waypoints.push({ lat: parsed.lat, lng: parsed.lng, name: parsed.name });
+
+  document.getElementById('waypointUrlInput').value = '';
+
+  await updateRoute();
+  renderMarkers();
+  renderRouteItems();
 }
 
-// Add POI from URL
-async function addFromUrl() {
+// Add POI from URL (local parsing, no server needed)
+function addFromUrl() {
   const urlInput = document.getElementById('urlInput').value.trim();
   const category = document.getElementById('urlCategory').value;
 
@@ -558,31 +729,24 @@ async function addFromUrl() {
     return;
   }
 
-  try {
-    const response = await fetch('/api/parse-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: urlInput })
-    });
+  const parsed = parseGoogleMapsUrlLocal(urlInput);
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    // Open POI modal with parsed data
-    openPOIModal({
-      name: data.name || '',
-      coordinates: { lat: data.lat, lng: data.lng },
-      category: category,
-      description: '',
-      phone: '',
-      hours: ''
-    });
-
-    document.getElementById('urlInput').value = '';
-
-  } catch (err) {
-    alert('Could not parse URL: ' + err.message);
+  if (!parsed) {
+    alert('Could not parse URL. Make sure it contains coordinates (look for @ symbol in the URL)');
+    return;
   }
+
+  // Open POI modal with parsed data
+  openPOIModal({
+    name: parsed.name || '',
+    coordinates: { lat: parsed.lat, lng: parsed.lng },
+    category: category,
+    description: '',
+    phone: '',
+    hours: ''
+  });
+
+  document.getElementById('urlInput').value = '';
 }
 
 // Open POI modal
@@ -678,6 +842,16 @@ function exportJSON() {
     return;
   }
 
+  // Decode polyline to GeoJSON LineString coordinates
+  let routeGeometry = null;
+  if (state.routePolyline) {
+    const points = decodePolyline(state.routePolyline);
+    routeGeometry = {
+      type: 'LineString',
+      coordinates: points.map(p => [p[1], p[0]]) // Convert [lat,lng] to [lng,lat] for GeoJSON
+    };
+  }
+
   const routeConfig = {
     startName: state.start.name,
     startCoordinates: { lat: state.start.lat, lng: state.start.lng },
@@ -698,7 +872,9 @@ function exportJSON() {
       hours: poi.hours
     })),
     estimatedDistance: state.routeInfo?.distanceMiles,
-    estimatedTime: state.routeInfo?.duration
+    estimatedTime: state.routeInfo?.duration,
+    // NEW: Pre-calculated route geometry for instant map rendering
+    routeGeometry: routeGeometry
   };
 
   const blob = new Blob([JSON.stringify(routeConfig, null, 2)], { type: 'application/json' });
@@ -713,7 +889,7 @@ function exportJSON() {
 // Import from JSON
 function importJSON(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const data = JSON.parse(e.target.result);
 
@@ -732,10 +908,36 @@ function importJSON(file) {
       state.waypoints = data.waypoints || [];
       state.pois = data.pois || [];
 
-      document.getElementById('startInput').value = data.startName;
-      document.getElementById('endInput').value = data.endName;
+      // Update URL mode inputs if visible
+      const startNameInput = document.getElementById('startNameInput');
+      const endNameInput = document.getElementById('endNameInput');
+      if (startNameInput) startNameInput.value = data.startName;
+      if (endNameInput) endNameInput.value = data.endName;
 
-      updateRoute();
+      // If we have stored route geometry, use it; otherwise fetch fresh
+      if (data.routeGeometry && data.routeGeometry.coordinates) {
+        // Convert GeoJSON [lng,lat] back to polyline for display
+        const points = data.routeGeometry.coordinates.map(c => [c[1], c[0]]);
+        routeLayer.clearLayers();
+        const line = L.polyline(points, {
+          color: '#3b82f6',
+          weight: 4,
+          opacity: 0.8
+        });
+        routeLayer.addLayer(line);
+        map.fitBounds(line.getBounds(), { padding: [50, 50] });
+
+        // Restore route info
+        state.routeInfo = {
+          distanceMiles: data.estimatedDistance,
+          duration: data.estimatedTime
+        };
+        showRouteInfo();
+      } else {
+        // No stored geometry, fetch from OSRM
+        await updateRoute();
+      }
+
       renderMarkers();
       renderRouteItems();
 
@@ -749,6 +951,13 @@ function importJSON(file) {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
+
+  // Mode toggle buttons
+  document.getElementById('modeTextBtn').addEventListener('click', () => setMode('text'));
+  document.getElementById('modeUrlBtn').addEventListener('click', () => setMode('url'));
+
+  // Default to URL mode (no API needed)
+  setMode('url');
 
   // Route button
   document.getElementById('setRouteBtn').addEventListener('click', setRoute);

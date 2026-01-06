@@ -39,9 +39,36 @@ export interface POI {
 }
 
 /**
+ * GeoJSON LineString geometry for pre-calculated route
+ * Note: Firestore stores coordinates as objects {lng, lat} since nested arrays aren't supported
+ * The useRoutes hook converts them back to [lng, lat] arrays for map rendering
+ */
+export interface RouteGeometry {
+  type: 'LineString';
+  coordinates: [number, number][]; // [lng, lat] pairs (GeoJSON format) - converted from Firestore objects
+}
+
+/**
+ * How coordinates are stored in Firestore (objects instead of nested arrays)
+ */
+export interface FirestoreCoordinate {
+  lng: number;
+  lat: number;
+}
+
+/**
  * Route configuration for a single day
+ * This is THE single source of truth for route data.
+ * Stored in: events/bajarun2026/routes/day{N}
  */
 export interface RouteConfig {
+  // Day information
+  day: number;
+  date: string;                    // "March 20, 2026"
+  title: string;                   // "Temecula to Rancho Meling"
+  description: string;             // Day description (legacy, use rideSummary)
+  rideSummary?: string;            // Short ride summary for itinerary display
+
   // Start location
   startCoordinates: Coordinates;
   startName: string;
@@ -50,21 +77,32 @@ export interface RouteConfig {
   endCoordinates: Coordinates;
   endName: string;
 
-  // Routing waypoints (intermediate points for Mapbox Directions API)
+  // Routing waypoints (intermediate points)
   waypoints: Coordinates[];
 
   // Points of Interest along route
   pois: POI[];
 
-  // Optional metadata
-  estimatedDistance?: number; // Miles
-  estimatedTime?: string;     // "6 hours"
+  // Route metrics
+  estimatedDistance?: number;      // Miles
+  estimatedTime?: string;          // "6h 22m"
+
+  // Pre-calculated route geometry (eliminates API calls)
+  routeGeometry?: RouteGeometry;
+
+  // Accommodation summary (not pricing, just text)
+  accommodation?: string;          // "Shared Room or Camping"
+  accommodationType?: 'hotel' | 'camping' | 'mixed';
 }
 
 /**
  * Empty defaults for initialization
  */
 export const emptyRouteConfig: RouteConfig = {
+  day: 0,
+  date: '',
+  title: '',
+  description: '',
   startCoordinates: { lat: 0, lng: 0 },
   startName: '',
   endCoordinates: { lat: 0, lng: 0 },

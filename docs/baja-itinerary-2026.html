@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baja California Adventure 2026 - Itinerary</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #1e293b;
+      background: white;
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        font-size: 10pt;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      .day-section {
+        page-break-inside: avoid;
+        page-break-before: always;
+      }
+
+      .day-section:first-of-type {
+        page-break-before: auto;
+      }
+
+      .cover-page {
+        page-break-after: always;
+      }
+
+      .summary-page {
+        page-break-after: always;
+      }
+    }
+
+    /* Cover Page */
+    .cover-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 2rem;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: white;
+    }
+
+    .cover-logo {
+      width: 120px;
+      height: 120px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2rem;
+      font-size: 3rem;
+    }
+
+    .cover-title {
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .cover-subtitle {
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: #60a5fa;
+      margin-bottom: 2rem;
+    }
+
+    .cover-dates {
+      font-size: 1.25rem;
+      color: #94a3b8;
+      margin-bottom: 3rem;
+    }
+
+    .cover-stats {
+      display: flex;
+      gap: 3rem;
+      margin-top: 2rem;
+    }
+
+    .cover-stat {
+      text-align: center;
+    }
+
+    .cover-stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #3b82f6;
+    }
+
+    .cover-stat-label {
+      font-size: 0.875rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .cover-footer {
+      margin-top: 4rem;
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+
+    /* Summary Page */
+    .summary-page {
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .summary-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #1e3a8a;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 3px solid #3b82f6;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 2rem;
+    }
+
+    .summary-table th {
+      background: #f1f5f9;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #475569;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .summary-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .summary-table tr:hover {
+      background: #f8fafc;
+    }
+
+    .day-badge {
+      display: inline-block;
+      background: #3b82f6;
+      color: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    .rest-badge {
+      background: #f59e0b;
+    }
+
+    /* Day Sections */
+    .day-section {
+      padding: 2rem;
+      min-height: auto;
+    }
+
+    .day-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .day-number {
+      background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .day-number-label {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      opacity: 0.8;
+    }
+
+    .day-number-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .day-info {
+      flex: 1;
+    }
+
+    .day-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 0.25rem;
+    }
+
+    .day-date {
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+
+    .day-rest-badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-icon {
+      font-size: 1.25rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Route Info */
+    .route-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .route-point {
+      flex: 1;
+    }
+
+    .route-label {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #3b82f6;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .route-name {
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .route-arrow {
+      color: #3b82f6;
+      font-size: 1.5rem;
+    }
+
+    /* Description */
+    .description {
+      margin-bottom: 1.5rem;
+    }
+
+    .description-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .description-text {
+      color: #334155;
+      line-height: 1.7;
+    }
+
+    .description-text p {
+      margin-bottom: 0.75rem;
+    }
+
+    .description-text ul, .description-text ol {
+      margin-left: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .description-text li {
+      margin-bottom: 0.25rem;
+    }
+
+    .description-text strong {
+      color: #1e293b;
+    }
+
+    /* Accommodation */
+    .accommodation {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .accommodation-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #166534;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .accommodation-name {
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 0.25rem;
+    }
+
+    .accommodation-details {
+      font-size: 0.875rem;
+      color: #475569;
+    }
+
+    .accommodation-details a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .accommodation-section {
+      margin-bottom: 0.75rem;
+    }
+
+    .accommodation-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .accommodation-label {
+      font-size: 0.75rem;
+      color: #059669;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    /* Highlights */
+    .highlights {
+      background: #fefce8;
+      border: 1px solid #fef08a;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .highlights-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #854d0e;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .highlights-list {
+      list-style: none;
+    }
+
+    .highlights-list li {
+      position: relative;
+      padding-left: 1.25rem;
+      margin-bottom: 0.5rem;
+      color: #422006;
+    }
+
+    .highlights-list li::before {
+      content: "★";
+      position: absolute;
+      left: 0;
+      color: #eab308;
+    }
+
+    /* Footer */
+    .page-footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <!-- Cover Page -->
+  <div class="cover-page">
+    <div class="cover-logo">🏍️</div>
+    <h1 class="cover-title">Baja California Adventure</h1>
+    <p class="cover-subtitle">2026 Itinerary</p>
+    <p class="cover-dates">March 19, 2026 – March 27, 2026</p>
+
+    <div class="cover-stats">
+      <div class="cover-stat">
+        <div class="cover-stat-value">1,951</div>
+        <div class="cover-stat-label">Total Miles</div>
+      </div>
+      <div class="cover-stat">
+        <div class="cover-stat-value">9</div>
+        <div class="cover-stat-label">Days</div>
+      </div>
+      <div class="cover-stat">
+        <div class="cover-stat-value">7</div>
+        <div class="cover-stat-label">Riding Days</div>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      <p>NorCal Moto Adventure</p>
+      <p>Temecula, CA → Death Valley via Baja Peninsula</p>
+    </div>
+  </div>
+
+  <!-- Summary Page -->
+  <div class="summary-page">
+    <h2 class="summary-title">Trip Overview</h2>
+
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Date</th>
+          <th>Route</th>
+          <th>Distance</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td><span class="day-badge rest-badge">Day 1</span></td>
+          <td>March 19, 2026</td>
+          <td>Arrival & Meet in Alpine CA</td>
+          <td>Rest Day</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge ">Day 2</span></td>
+          <td>March 20, 2026</td>
+          <td>Alpine to Rancho Meling</td>
+          <td>223 mi</td>
+          <td>5h 23m</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge ">Day 3</span></td>
+          <td></td>
+          <td>Rancho Meling to Guerrero Negro</td>
+          <td>344 mi</td>
+          <td>7h 21m</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge ">Day 4</span></td>
+          <td></td>
+          <td>Guerrero Negro to Playa El Burro</td>
+          <td>199 mi</td>
+          <td>5h 9m</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge rest-badge">Day 5</span></td>
+          <td></td>
+          <td>Bahía Concepción Rest Day</td>
+          <td>Rest Day</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge ">Day 6</span></td>
+          <td></td>
+          <td>Playa El Burro to Bahía de los Ángeles</td>
+          <td>312 mi</td>
+          <td>6h  03m</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge ">Day 7</span></td>
+          <td></td>
+          <td>Bahía de los Ángeles to Tecate</td>
+          <td>402 mi</td>
+          <td>8h 1m</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge ">Day 8</span></td>
+          <td></td>
+          <td>Tecate to Twentynine Palms</td>
+          <td>230 mi</td>
+          <td>5h 27m</td>
+        </tr>
+        <tr>
+          <td><span class="day-badge ">Day 9</span></td>
+          <td>March 27, 2026</td>
+          <td>Twentynine Palms to Furnace Creek</td>
+          <td>241 mi</td>
+          <td>4h 34m</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="page-footer">
+      Generated January 4, 2026
+    </div>
+  </div>
+
+  <!-- Day Sections -->
+  
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">1</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Arrival & Meet in Alpine CA
+          <span class="day-rest-badge">Rest Day</span>
+        </h2>
+        <p class="day-date">March 19, 2026</p>
+      </div>
+    </div>
+
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>Every rider is on their own to get to Alpine. The hotel check-in is 4 PM. It is right across the street from Mike Hess BrewPub where we can meeet up for dinner. </p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Hotel Option</div>
+        <div class="accommodation-name">Ayres Lodge Alpine</div>
+        <div class="accommodation-details">
+          <div>1251 Tavern Rd, Alpine, CA 91901, United States</div>
+          <div>Phone: +1-619-445-5800</div>
+          <div>Set in the scenic foothills of the Cuyamaca Mountains, the Ayres Lodge Alpine offers a blend of rustic charm and modern comfort. It is the perfect starting point for our Baja tour, located a scenic 40 miles to the border and directly across the street from Mike Hess Brewpub, where we will meet for our kickoff dinner.
+
+Hotel Amenities:
+
+Complimentary Full Breakfast: Served daily to fuel up before we hit the road.
+
+Recreation: Heated outdoor pool, hot tub, and fitness center.
+
+Comforts: Free high-speed Wi-Fi, pillow-top beds, and an inviting lobby fireplace.
+
+In-Room: All rooms include a coffee maker microwave and refrigerator.
+Convenience: Free self-parking and guest laundry facilities.</div>
+        </div>
+      </div>
+      
+
+      
+    </div>
+    
+
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">2</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Alpine to Rancho Meling
+          
+        </h2>
+        <p class="day-date">March 20, 2026</p>
+      </div>
+    </div>
+
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-value">223 mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">5h 23m</div>
+        <div class="stat-label">Riding Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏨</div>
+        <div class="stat-value">Hotel / Camping</div>
+        <div class="stat-label">Accommodation</div>
+      </div>
+    </div>
+
+    <div class="route-info">
+      <div class="route-point">
+        <div class="route-label">From</div>
+        <div class="route-name">Ayres Lodge Alpine</div>
+      </div>
+      <div class="route-arrow">→</div>
+      <div class="route-point">
+        <div class="route-label">To</div>
+        <div class="route-name">Rancho Meiling</div>
+      </div>
+    </div>
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>This first leg of our journey is a spectacular transition from the rolling hills of Southern California’s wine country to the rugged, high-altitude wilderness of Baja’s Sierra de San Pedro Mártir. Starting in Temecula, you’ll head south through the winding backroads of San Diego County, crossing the border at the quiet and rider-friendly Tecate port of entry. From there, you’ll pick up the "Ruta del Vino" (Highway 3), a world-class motorcycling road that carves through the lush vineyards of the Valle de Guadalupe. The descent into Ensenada offers stunning views of the Pacific, but the real adventure begins as you turn south onto Highway 1, leaving the coastal bustle behind for the dusty, wide-open horizons of the Baja frontier.</p><p>The final stretch takes you off the main highway and deep into the mountains toward Rancho Meling. As you turn east, the pavement eventually gives way to a well-maintained but remote graded road that climbs into the foothills of the Sierra de San Pedro Mártir. The air cools and the landscape shifts dramatically from desert scrub to granite boulders and high-country ranch land. Arriving at the historic ranch feels like stepping back in time; tucked away in a valley beneath Baja’s highest peaks, it serves as a rustic, peaceful sanctuary and the perfect ending to our first day on the tour. </p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Hotel Option</div>
+        <div class="accommodation-name">Rancho Meiling</div>
+        <div class="accommodation-details">
+          <div>22913 Baja California, Mexico</div>
+          <div>Phone: +52-646-255-8062</div>
+          <div>Rancho Meling is a historic, 10,000-acre working cattle ranch located in the foothills of the Sierra San Pedro Mártir. Established over 120 years ago, it serves as an outpost for adventure travelers and motorcycle groups heading to the National Park or the National Astronomical Observatory. The ranch offers a rustic, "off-the-grid" experience where electricity is provided by a generator during specific hours (typically mornings and evenings). Guests can enjoy a swimming pool, home-cooked ranch-style meals served family-style in a communal dining room, and vast areas for camping Its isolated location makes it one of the premier spots in Baja for stargazing due to the lack of light pollution.</div>
+        </div>
+      </div>
+      
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Camping Option</div>
+        <div class="accommodation-name">Rancho Meiling </div>
+        <div class="accommodation-details">Great grass camping right at the hotel.  Showers available</div>
+      </div>
+      
+    </div>
+    
+
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">3</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Rancho Meling to Guerrero Negro
+          
+        </h2>
+        <p class="day-date"></p>
+      </div>
+    </div>
+
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-value">344 mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">7h 21m</div>
+        <div class="stat-label">Riding Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏨</div>
+        <div class="stat-value">Hotel / Camping</div>
+        <div class="stat-label">Accommodation</div>
+      </div>
+    </div>
+
+    <div class="route-info">
+      <div class="route-point">
+        <div class="route-label">From</div>
+        <div class="route-name">Rancho Meiling</div>
+      </div>
+      <div class="route-arrow">→</div>
+      <div class="route-point">
+        <div class="route-label">To</div>
+        <div class="route-name">Laguna Ojo de Liebre Campground</div>
+      </div>
+    </div>
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>The ride from <strong>Rancho Meling</strong> to <strong>Laguna Ojo de Liebre </strong>is a breathtaking transition through Baja’s most diverse ecosystems, starting in the high-altitude pine forests and granite spires of the <strong>Sierra de San Pedro Mártir</strong>. As you descend toward the Pacific, the cool mountain air gives way to the rugged Mediterranean scrub of the coast and the agricultural hub of San Quintín. This initial leg offers a mix of technical mountain curves and dusty coastal stretches.</p><h3>Catavina</h3><p>As you push further south, the landscape shifts into the surreal, prehistoric beauty of the Cataviña boulder fields, where giant cardón cacti and spindly Boojum trees stand among massive white granite outcrops. This is the heart of the Vizcaíno Desert, a remote and desolate stretch that demands respect for the elements. Crossing the 28th parallel into Baja California Sur, the terrain flattens into expansive salt flats and coastal dunes, culminating at the shores of the lagoon. The journey concludes at the tranquil waters of Ojo de Liebre, where the harsh desert heat meets the Pacific breeze in a sanctuary famous for its migrating gray whales.</p><h3>Fuel Management</h3><p>The 200-mile stretch between El Rosario and Villa Jesús María is the longest gap without a formal gas station on Highway 1.   Be sure to top off your tank at the Pemex in El Rosario; failing to do so can leave you stranded in the high desert. You can top up your cas from the gasolina truck sold from a 55 gallon barrel on the back of a pick up. Your next reliable pump is at Villa Jesús María or the various stations in Guerrero Negro, just north of the lagoon.</p><p>While the GSA can make this stretch, other bikes should carry extra fuel. The [Giant Loop Armadillo Bag](https://giantloopmoto.com/products/armadillo-bag?srsltid=AfmBOop4Mbb0G5_cKB_YgdrTHYOHTnTIIdY2AWYJyr90IX_IXNgeqKqv) is a great option</p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Hotel Option</div>
+        <div class="accommodation-name">Laguna Ojo de Liebre Campground</div>
+        <div class="accommodation-details">
+          
+          
+          
+        </div>
+      </div>
+      
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Camping Option</div>
+        <div class="accommodation-name">Laguna Ojo de Liebre Campground</div>
+        <div class="accommodation-details">Rustic Camping near the whale watching.  </div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="highlights">
+      <h3 class="highlights-title">⭐ Highlights</h3>
+      <ul class="highlights-list">
+        <li>Vizcaíno Desert landscapes</li><li>28th Parallel - Baja California Sur border</li><li>Salt evaporation ponds</li><li>Laguna Ojo de Liebre whale sanctuary</li>
+      </ul>
+    </div>
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">4</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Guerrero Negro to Playa El Burro
+          
+        </h2>
+        <p class="day-date"></p>
+      </div>
+    </div>
+
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-value">199 mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">5h 9m</div>
+        <div class="stat-label">Riding Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏨</div>
+        <div class="stat-value">Camping</div>
+        <div class="stat-label">Accommodation</div>
+      </div>
+    </div>
+
+    <div class="route-info">
+      <div class="route-point">
+        <div class="route-label">From</div>
+        <div class="route-name">23940 Heroica Mulegé, B.C.S., Mexico</div>
+      </div>
+      <div class="route-arrow">→</div>
+      <div class="route-point">
+        <div class="route-label">To</div>
+        <div class="route-name">Playa el Burro-Bay of Concepcion </div>
+      </div>
+    </div>
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>The ride from Laguna Ojo de Liebre to Playa El Burro takes you on a dramatic trans-peninsular crossing, moving from the cool, misty Pacific coast to the brilliant turquoise waters of the Sea of Cortez. This roughly 140-mile journey begins with a fast, flat sweep across the Vizcaíno Desert before reaching the oasis town of San Ignacio. This is a mandatory stop for any rider; the town is built around a lush grove of date palms and features a stunning 18th-century stone mission. The road then climbs into the volcanic "Three Virgins" mountains, where you’ll navigate steep, winding switchbacks—known as Cuesta del Infierno (Hell’s Grade)—offering spectacular views of the Las Vírgenes volcanoes before dropping toward the French-influenced mining town of Santa Rosalía.</p><p>The final leg of the ride follows the coastline south through Mulegé and opens up into the breathtaking Bahía Concepción. This stretch of Highway 1 is world-renowned for its scenic beauty, as the road hugs the edge of red volcanic cliffs that plunge directly into the emerald and sapphire waters of the bay. You will pass a string of white-sand coves until you reach Playa El Burro, a crescent-shaped beach famous for its calm waters and palapa-lined shore. It is the perfect place to drop the kickstand, as the bay's sheltered position makes the water warm and still, a stark contrast to the rugged Pacific swells where your day began.</p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Camping Option</div>
+        <div class="accommodation-name">Bahia Concepcion Camping</div>
+        <div class="accommodation-details">Spectacular  beach camping on the edge of the water.  Rustic with no showers.  Resturant close by</div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="highlights">
+      <h3 class="highlights-title">⭐ Highlights</h3>
+      <ul class="highlights-list">
+        <li>Gray whale watching - get the first boat out to give you plenty of time to get to camp</li><li>San Ignacio Oasis: Palm-fringed town with stunning 18th-century stone mission</li><li>Volcán Las Tres Vírgenes: Towering dormant volcanoes near the Sea of Cortez</li><li>Cuesta del Infierno: Thrilling steep switchbacks dropping to the coast</li><li>Santa Rosalía: French-influenced mining town with Eiffel-designed iron church</li><li>Panaderia El Boleo: Century-old bakery famous for French-style breads</li><li>Mulegé River Overlook: Panoramic view of palm oasis meeting the sea</li>
+      </ul>
+    </div>
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">5</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Bahía Concepción Rest Day
+          <span class="day-rest-badge">Rest Day</span>
+        </h2>
+        <p class="day-date"></p>
+      </div>
+    </div>
+
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>Take a break at one of Baja’s most stunning locations. Today is yours to spend however you choose, whether you want to recharge your batteries or keep the wheels turning:</p><p>Relax & Explore: Spend the day lounging on the pristine white-sand beaches of the bay or exploring the local coves and turquoise</p><p>waters.</p><p>The Mulegé Loop:Take a short ride north to the lush oasis of Mulegé. You can visit the historic 1705 mission, take in the views of the palm-filled valley, and enjoy a relaxed local lunch.</p><p>Ride to Loreto: For more miles, head south to Loreto. As the first capital of the Californias, it features the very first</p><p>mission on the El Camino Real. Stroll the scenic Malecón</p><p>(boardwalk) and explore the many vibrant shops and restaurants.</p><p>The San Javier Climb:f you’re craving a full day of riding, continue past Loreto and climb into the mountains to the historic village of San Javier. The ride offers spectacular views and leads to one of the best-preserved stone missions in all of Baja.</p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Camping Option</div>
+        <div class="accommodation-name">Bahia Concepcion Camping</div>
+        <div class="accommodation-details">Spectacular beach camping on the edge of the water.  Rustic with no showers.  Resturant close by or ride into Mulege</div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="highlights">
+      <h3 class="highlights-title">⭐ Highlights</h3>
+      <ul class="highlights-list">
+        <li>Kayaking and snorkeling in crystal-clear waters</li><li>Explore nearby beaches: Playa Santispac, Playa Coyote, Playa Requeson</li><li>Visit the historic town of Mulegé (30 min ride)</li><li>Visit the town of Loreto or head up to the historic Mission San Javier</li><li>Fresh seafood at beachside palapas</li>
+      </ul>
+    </div>
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">6</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Playa El Burro to Bahía de los Ángeles
+          
+        </h2>
+        <p class="day-date"></p>
+      </div>
+    </div>
+
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-value">312 mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">6h  03m</div>
+        <div class="stat-label">Riding Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏨</div>
+        <div class="stat-value">Hotel / Camping</div>
+        <div class="stat-label">Accommodation</div>
+      </div>
+    </div>
+
+    <div class="route-info">
+      <div class="route-point">
+        <div class="route-label">From</div>
+        <div class="route-name">Playa el Burro-Bay of Concepcion </div>
+      </div>
+      <div class="route-arrow">→</div>
+      <div class="route-point">
+        <div class="route-label">To</div>
+        <div class="route-name">Camp Archelon-Bahia de los Angeles</div>
+      </div>
+    </div>
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>We will be staying in an old Turtle Reserve.  There are a few small casitas and camping onsite.  In addition there is a small cafe style resturant. Wou will need to be flexible on housing arrangements as there might not have beds for everyone so I added an option if you are ok sleeping on the floor with your camp mattress. The Bonus is 50% cost resduction.   There are other hotels in town if this doesnt work for you.  Los Vientos is a good option and can be reserved on Expedia</p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Hotel Option</div>
+        <div class="accommodation-name">Camp Archelon Casitas</div>
+        <div class="accommodation-details">
+          <div>a la Gringa, Campo Archelon km 3-km 3, Campo Archelon, 22980 Bahía de los Ángeles, B.C., Mexico</div>
+          <div>Phone: +52-646-383-3326</div>
+          <div>Individual casitas mostly two beds and a sofa bed.  We may not have proper beds for everyone that wants one.  There are other hotels in the area as an option </div>
+        </div>
+      </div>
+      
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Camping Option</div>
+        <div class="accommodation-name">Camp Archelon</div>
+        <div class="accommodation-details">Nice Campgroup with palapas. onsite small restaurant </div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="highlights">
+      <h3 class="highlights-title">⭐ Highlights</h3>
+      <ul class="highlights-list">
+        <li>Coastal Highway 1 scenery</li><li>Bahía de los Ángeles bay views</li><li>Remote desert landscapes on Highway 12</li><li>Island views in the Sea of Cortez</li><li>The "L.A. Bay" Turnoff Whale Shark Mural - nice photo op</li>
+      </ul>
+    </div>
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">7</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Bahía de los Ángeles to Tecate
+          
+        </h2>
+        <p class="day-date"></p>
+      </div>
+    </div>
+
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-value">402 mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">8h 1m</div>
+        <div class="stat-label">Riding Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏨</div>
+        <div class="stat-value">Hotel</div>
+        <div class="stat-label">Accommodation</div>
+      </div>
+    </div>
+
+    <div class="route-info">
+      <div class="route-point">
+        <div class="route-label">From</div>
+        <div class="route-name">Camp Archelon-Bahia de los Angeles</div>
+      </div>
+      <div class="route-arrow">→</div>
+      <div class="route-point">
+        <div class="route-label">To</div>
+        <div class="route-name">Tecate </div>
+      </div>
+    </div>
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>This is the "Ironman" leg of your journey—a nearly 400-mile push that demands an early start to reach the border before dark. Because Highway 5 is now fully paved and significantly straighter than the winding Highway 1, you can maintain a much higher average speed. The road surface through the Valley of the Giants is generally excellent, alhtough there are some potions of the route with large whoop de whoops that are quite large and will launch your bike if you are on the throttle. With minimal traffic and very few towns to slow you down, this is the day where your bike’s long-distance capabilities are truly put to the test.</p><p>As you leave the coastal plains of <strong>San Felipe</strong> behind, the landscape shifts into the vast, open expanse of the Laguna Salada. This section is a high-speed transit where the horizon seems to stretch forever, but stay alert for sudden crosswinds that can sweep across the dry lake bed. The final transition from the desert floor into the Sierra Juárez mountains provides a refreshing drop in temperature and a welcome change in terrain. The sweeping curves of the climb toward Tecate offer a final, exhilarating workout for your tires, serving as a perfect "cool down" after the long, straight desert run.</p><h3>Note</h3><p>The <strong>San Felipe 250</strong> Baja race starts today so it may be very crowded in town.   Given the length of the route and the crowds it's advisable to skip stopping in San Felipe.</p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Hotel Option</div>
+        <div class="accommodation-name">Santuario Diegueño</div>
+        <div class="accommodation-details">
+          
+          <div>Phone: +52-665-654-4777</div>
+          <div>Santuario Diegueño is a boutique hotel honoring the Kumeyaay indigenous heritage with neo-vernacular architecture and Mexican art collections throughout. Amenities include the ASAO Restaurant for onsite dining, pool, hot tub, spa, landscaped gardens with native regional plants, and an event hall. Breakfast is included in this Rate</div>
+        </div>
+      </div>
+      
+
+      
+    </div>
+    
+
+    
+    <div class="highlights">
+      <h3 class="highlights-title">⭐ Highlights</h3>
+      <ul class="highlights-list">
+        <li>Gonzaga Bay</li><li>The Puertecitos Twisties</li><li>Valley of the Giants</li><li>La Rumorosa Grade</li><li>San Felipe Malecon</li>
+      </ul>
+    </div>
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">8</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Tecate to Twentynine Palms
+          
+        </h2>
+        <p class="day-date"></p>
+      </div>
+    </div>
+
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-value">230 mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">5h 27m</div>
+        <div class="stat-label">Riding Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏨</div>
+        <div class="stat-value">Hotel / Camping</div>
+        <div class="stat-label">Accommodation</div>
+      </div>
+    </div>
+
+    <div class="route-info">
+      <div class="route-point">
+        <div class="route-label">From</div>
+        <div class="route-name">Tecate, Baja California, Mexico</div>
+      </div>
+      <div class="route-arrow">→</div>
+      <div class="route-point">
+        <div class="route-label">To</div>
+        <div class="route-name">Twentynine Palms</div>
+      </div>
+    </div>
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>Today's ride is a "best-of" tour of the region's mountain passes and desert vistas. After crossing at Tecate, you’ll head north into the oak-lined twisties of San Diego County to reach the <strong>Sunrise Scenic Highway</strong>. This ridge-top run through the Laguna Mountains provides a breathtaking perspective, with 6,000-foot views that drop off sharply into the Anza-Borrego Desert. After a stop in the historic gold-mining town of Julian—famous for its legendary apple pie—you’ll navigate the winding forest roads toward the San Jacinto Mountains.</p><p>The ride reaches its technical crescendo as you pick up Highway 74, famously known as the <strong>"Palms to Pines Scenic Byway."</strong> This road is a masterclass in civil engineering, carving a rhythmic path through alpine forests before beginning a staggering descent into the Coachella Valley. As the pines give way to desert scrub, you’ll hit the iconic "Seven-Level Hill," a series of dramatic, stacked switchbacks that offer a bird's-eye view of Palm Desert below. The transition from the cool mountain air to the desert heat is swift and exhilarating, dropping you directly into the heart of the valley. From there, a final desert cruise north takes you to Twentynine Palms, serving as a serene finish to an epic trans-peninsular adventure.</p><h3>Key Stops</h3><ul><li><strong>Julian</strong> (Break): Don't skip the apple pie at the Julian Pie Company; it’s the unofficial headquarters for motorcyclists in the region.</li><p></ul>  </p><ul><li>The Overlook: Be sure to pull over at the Coachella Valley Vista Point on Highway 74. It offers the best photo opportunity of the switchbacks you just conquered, with the entire valley spread out beneath your kickstand.</li><p></ul></p>
+      </div>
+    </div>
+    
+
+    
+    <div class="accommodation">
+      <h3 class="accommodation-title">🏨 Accommodation</h3>
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Hotel Option</div>
+        <div class="accommodation-name">Oasis Inn & Suites Joshua Tree - 29 Palms</div>
+        <div class="accommodation-details">
+          
+          <div>Phone: +1-760-361-4009</div>
+          <div>The Oasis is a moderate hotel with a pool, on site resturant  and close by great resturants.  </div>
+        </div>
+      </div>
+      
+
+      
+      <div class="accommodation-section">
+        <div class="accommodation-label">Camping Option</div>
+        <div class="accommodation-name">Indian Cove Camping </div>
+        <div class="accommodation-details">Great campsite-cost is approximate depending on how many people camp</div>
+      </div>
+      
+    </div>
+    
+
+    
+    <div class="highlights">
+      <h3 class="highlights-title">⭐ Highlights</h3>
+      <ul class="highlights-list">
+        <li>Julian: Historic gold-mining charm and legendary apple pies</li><li>Sunrise Scenic Byway: High-elevation sweepers through Cleveland National Forest</li><li>Joshua Tree National Park: Rock monoliths and iconic Joshua trees</li>
+      </ul>
+    </div>
+    
+  </div>
+  <div class="day-section">
+    <div class="day-header">
+      <div class="day-number">
+        <span class="day-number-label">Day</span>
+        <span class="day-number-value">9</span>
+      </div>
+      <div class="day-info">
+        <h2 class="day-title">
+          Twentynine Palms to Furnace Creek
+          
+        </h2>
+        <p class="day-date">March 27, 2026</p>
+      </div>
+    </div>
+
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-value">241 mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">4h 34m</div>
+        <div class="stat-label">Riding Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏨</div>
+        <div class="stat-value"></div>
+        <div class="stat-label">Accommodation</div>
+      </div>
+    </div>
+
+    <div class="route-info">
+      <div class="route-point">
+        <div class="route-label">From</div>
+        <div class="route-name">Twentynine Palms</div>
+      </div>
+      <div class="route-arrow">→</div>
+      <div class="route-point">
+        <div class="route-label">To</div>
+        <div class="route-name">Furnace Creek Campground</div>
+      </div>
+    </div>
+    
+
+    
+    <div class="description">
+      <h3 class="description-title">About This Day</h3>
+      <div class="description-text">
+        <p>The final leg of our tour from <strong>Twentynine Palms</strong> to <strong>Furnace Creek</strong> takes you through the heart of the Mojave, featuring a mix of kitschy Americana and raw, prehistoric desert beauty. Heading north, you'll travel through Amboy and a small portion of historic route 66 passing and Kelso an old railroad station.  Unfortunately the visitor center is closed but there are bathrooms if you need them.  The route continues  to <strong>Baker</strong>, the "Gateway to Death Valley." Take a stop at the World's Tallest Thermometer, a 134-foot landmark that commemorates the record-breaking 134°F temperature set in the park back in 1913. It's the perfect spot to grab a cold drink, and gas up. </p><p>The [Mad Greek](https://www.themadgreek.com/) is a good place for lunch if you are hungary. </p><p>From Baker, you'll head north on Highway 127, a lonely and beautiful stretch of pavement that skirts the edge of the Dumont Dunes and the Amargosa River. This route brings you into the tiny, spring-fed oasis of <strong>Shoshone</strong>, where the lush greenery provides a stark contrast to the surrounding rock. Instead of dropping into the low basin via Badwater, you'll continue north to Death Valley Junction—home to the historic and haunting Amargosa Opera House—before turning west onto Highway 190. This path takes you through the high-altitude gates of the park, offering a steady, scenic climb through golden badlands and the jagged shadows of the Black Mountains.</p><p>Continue past the Oasis at Furnance Creek a full service hotel with expensive general store to the <strong>Furnance Creek Campground</strong> on the left.  Have your pass ready for the check-in with the park ranger. </p>
+      </div>
+    </div>
+    
+
+    
+
+    
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>POI Migration Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+    h1 { color: #333; border-bottom: 3px solid #0066cc; padding-bottom: 10px; }
+    h2 { color: #0066cc; margin-top: 40px; }
+    .day-section { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .day-title { font-size: 1.3em; color: #333; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #0066cc; color: white; padding: 12px; text-align: left; }
+    td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+    tr:hover { background: #f8f8f8; }
+    .routes-col { width: 45%; }
+    .pricing-col { width: 45%; }
+    .unique-col { width: 10%; text-align: center; }
+    .poi-item { margin: 4px 0; padding: 6px 10px; border-radius: 4px; font-size: 0.9em; }
+    .poi-gas { background: #fff3cd; }
+    .poi-restaurant { background: #ffe5d0; }
+    .poi-viewpoint { background: #d4edda; }
+    .poi-photo { background: #e2d5f1; }
+    .poi-poi { background: #cce5ff; }
+    .poi-border { background: #f8d7da; }
+    .poi-emergency { background: #f8d7da; }
+    .highlight { background: #f0f0f0; color: #888; font-style: italic; }
+    .migrate-yes { color: #28a745; font-weight: bold; font-size: 1.2em; }
+    .migrate-no { color: #6c757d; }
+    .migrate-skip { color: #aaa; font-size: 0.8em; }
+    .category { font-weight: bold; color: #666; font-size: 0.8em; }
+    .summary { background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #28a745; }
+    .legend { display: flex; gap: 15px; flex-wrap: wrap; margin: 20px 0; }
+    .legend-item { padding: 5px 10px; border-radius: 4px; font-size: 0.85em; }
+    .no-migration { background: #f8f9fa; padding: 10px; border-radius: 4px; color: #666; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>POI Migration Report</h1>
+  <p>This report shows <strong>actual POIs</strong> (with coordinates/categories) from <strong>eventConfig/pricing</strong> that should be migrated to <strong>events/bajarun2026/routes</strong>.</p>
+  <p><em>Note: Descriptive highlights (plain text without coordinates) are NOT considered POIs and are shown greyed out.</em></p>
+
+  <div class="legend">
+    <span class="legend-item poi-gas">[gas] Gas Station</span>
+    <span class="legend-item poi-restaurant">[restaurant] Restaurant</span>
+    <span class="legend-item poi-viewpoint">[viewpoint] Viewpoint</span>
+    <span class="legend-item poi-photo">[photo] Photo Op</span>
+    <span class="legend-item poi-poi">[poi] Point of Interest</span>
+    <span class="legend-item poi-border">[border] Border Crossing</span>
+    <span class="legend-item highlight">Highlight (not a POI)</span>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 1: Arrival & Meet in Temecula</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (0 POIs)</th>
+        <th class="pricing-col">Pricing Collection (2 POIs + 0 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td></td>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><div class="poi-item poi-border"><span class="category">[border]</span> Tecate Border Crossing</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 2: Temecula to Rancho Meling</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (3 POIs)</th>
+        <th class="pricing-col">Pricing Collection (0 POIs + 0 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> BP Gas Station</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> eskala</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> La Bufadora</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 3: Rancho Meling to Guerrero Negro</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (10 POIs)</th>
+        <th class="pricing-col">Pricing Collection (0 POIs + 4 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Gasolina Truck</div></td>
+        <td><div class="poi-item highlight">Vizcaíno Desert landscapes</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td><div class="poi-item highlight">28th Parallel - Baja California Sur border</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> BajaCactus</div></td>
+        <td><div class="poi-item highlight">Salt evaporation ponds</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> eskala</div></td>
+        <td><div class="poi-item highlight">Laguna Ojo de Liebre whale sanctuary</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> OXXO</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Mamá Espinoza Restaurante</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Valley of the Candles (Valle de los Cirios)</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Catavina Pinturas Rupestres</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Cactus Camp</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 4: Guerrero Negro to Playa El Burro</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (12 POIs)</th>
+        <th class="pricing-col">Pricing Collection (0 POIs + 7 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Vp Racing</div></td>
+        <td><div class="poi-item highlight">Gray whale watching-get the first boat  out to give you plenty of time to get to camp</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td><div class="poi-item highlight">San Ignacio Oasis: Palm-fringed town with stunning 18th-century stone mission</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> AUTOSERVICIO GUERRERO NEGRO</div></td>
+        <td><div class="poi-item highlight">Volcán Las Tres Vírgenes: Towering dormant volcanoes near the Sea of Cortez</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> San Ignacio</div></td>
+        <td><div class="poi-item highlight">Cuesta del Infierno: Thrilling steep switchbacks dropping to the coast</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-photo"><span class="category">[photo]</span> Santa Rosalía B.C.S.</div></td>
+        <td><div class="poi-item highlight"> Santa Rosalía: French-influenced mining town with Eiffel-designed iron church</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Misión Santa Rosalía de Mulegé</div></td>
+        <td><div class="poi-item highlight">Panaderia El Boleo: Century-old bakery famous for French-style breads</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Restaurant Bar Los Equipales</div></td>
+        <td><div class="poi-item highlight"> Mulegé River Overlook: Panoramic view of palm oasis meeting the sea</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-photo"><span class="category">[photo]</span> Faro de Mulegé</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Berthas Pollo</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Bar Aracely</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Restaurant JC'S</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 5: Bahía Concepción Rest Day</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (3 POIs)</th>
+        <th class="pricing-col">Pricing Collection (0 POIs + 5 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> 23893 San Javier, BCS, Mexico</div></td>
+        <td><div class="poi-item highlight">Kayaking and snorkeling in crystal-clear waters</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Loreto, BCS, Mexico</div></td>
+        <td><div class="poi-item highlight">Explore nearby beaches: Playa Santispac, Playa Coyote, Playa Requeson</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Gasolinera Pemex</div></td>
+        <td><div class="poi-item highlight">Visit the historic town of Mulegé (30 min ride)</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><div class="poi-item highlight">Visit the town of Loreto or head up to the historic Mission San Javier</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><div class="poi-item highlight">Fresh seafood at beachside palapas</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 6: Playa El Burro to Bahía de los Ángeles</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (5 POIs)</th>
+        <th class="pricing-col">Pricing Collection (0 POIs + 5 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td><div class="poi-item highlight">Coastal Highway 1 scenery</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Servicio Santa Rosalía</div></td>
+        <td><div class="poi-item highlight">Bahía de los Ángeles bay views</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td><div class="poi-item highlight">Remote desert landscapes on Highway 12</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td><div class="poi-item highlight"> Island views in the Sea of Cortez</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Museo de la Ballena de Guerrero Negro</div></td>
+        <td><div class="poi-item highlight">The "L.A. Bay" Turnoff Whale Shark Mural-nice photo op</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 7: Bahía de los Ángeles to Tecate</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (9 POIs)</th>
+        <th class="pricing-col">Pricing Collection (0 POIs + 5 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> ARCO</div></td>
+        <td><div class="poi-item highlight">Gonzaga Bay</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> MOBIL GLORIETA SAN FELIPE</div></td>
+        <td><div class="poi-item highlight">The Puertecitos Twisties</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> ARCO</div></td>
+        <td><div class="poi-item highlight">Valley of the Giants</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td><div class="poi-item highlight">La Rumorosa Grade</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Chenowth Legacy Lodge</div></td>
+        <td><div class="poi-item highlight">San Felipe Malecon</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Malecón San Felipe</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> GAS-MAR LA BAHI</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Pemex</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 8: Tecate to Twentynine Palms</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (12 POIs)</th>
+        <th class="pricing-col">Pricing Collection (0 POIs + 3 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Coachella Valley Vista Point</div></td>
+        <td><div class="poi-item highlight">Julian: Historic gold-mining charm and legendary apple pies</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Sunrise National Scenic Byway</div></td>
+        <td><div class="poi-item highlight">Sunrise Scenic Byway: High-elevation sweepers through Cleveland National Forest</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Scenic Lookout</div></td>
+        <td><div class="poi-item highlight">Joshua Tree National Park: Rock monoliths and iconic Joshua trees</div></td>
+        <td><span class="migrate-skip">highlight</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Inspiration Point Scenic Overlook</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Scenic View</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> The Rib Co</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Julian Cafe & Bakery</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Sunshine summit market And Gas</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Ramco</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Sunshine summit market And Gas</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> ARCO</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Chevron Twentynine Palms</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="day-section">
+    <div class="day-title">Day 9: Twentynine Palms to Furnace Creek</div>
+    <table>
+      <tr>
+        <th class="routes-col">Routes Collection (11 POIs)</th>
+        <th class="pricing-col">Pricing Collection (10 POIs + 0 highlights)</th>
+        <th class="unique-col">Migrate?</th>
+      </tr>
+
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> The Mad Greek</div></td>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> ARCO</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Chevron Twentynine Palms</div></td>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> The Mad Greek</div></td>
+        <td><span class="migrate-no">exists</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Chevron</div></td>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Kelso Depot Visitor Center</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Chevron</div></td>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Crowbar Cafe & Saloon</div></td>
+        <td><span class="migrate-no">exists</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-restaurant"><span class="category">[restaurant]</span> Crowbar Cafe & Saloon</div></td>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Chevron</div></td>
+        <td><span class="migrate-no">exists</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-gas"><span class="category">[gas]</span> Furnace Creek Gas Station</div></td>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Zabriskie Point Parking Lot</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Mojave Desert Lava Tube</div></td>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Death Valley National Park Sign</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Artists Palette</div></td>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Death Valley Junction Historic District</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Dantes View</div></td>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> Twenty Mule Team Canyon</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Old Spanish Trail Sign</div></td>
+        <td><div class="poi-item poi-poi"><span class="category">[poi]</span> The Inn at Death Valley</div></td>
+        <td><span class="migrate-yes">YES</span></td>
+      </tr>
+      <tr>
+        <td><div class="poi-item poi-viewpoint"><span class="category">[viewpoint]</span> Tecopa Mesa</div></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="summary">
+    <h2>Summary: Real POIs to Migrate</h2>
+<p><strong>9</strong> real POI(s) in pricing should be migrated to routes:</p>
+    <ul>
+      <li><strong>Day 1:</strong> 2 POI(s)<ul><li>[gas] Pemex</li><li>[border] Tecate Border Crossing</li></ul></li>
+      <li><strong>Day 9:</strong> 7 POI(s)<ul><li>[gas] ARCO</li><li>[poi] Kelso Depot Visitor Center</li><li>[poi] Zabriskie Point Parking Lot</li><li>[poi] Death Valley National Park Sign</li><li>[poi] Death Valley Junction Historic District</li><li>[poi] Twenty Mule Team Canyon</li><li>[poi] The Inn at Death Valley</li></ul></li>
+    </ul>
+  </div>
+</body>
+</html>

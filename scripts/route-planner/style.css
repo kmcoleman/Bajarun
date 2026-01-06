@@ -129,6 +129,23 @@ select {
   border: 1px solid #1a4a7a;
 }
 
+.btn-small.btn-active {
+  background: #e94560;
+  color: #fff;
+  border-color: #e94560;
+}
+
+/* Toggle row */
+.toggle-row {
+  display: flex;
+  gap: 6px;
+}
+
+.toggle-row .btn-small {
+  flex: 1;
+  text-align: center;
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
